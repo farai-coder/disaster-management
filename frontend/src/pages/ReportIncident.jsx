@@ -72,17 +72,21 @@ export default function ReportIncident() {
   const searchLocation = (query) => {
     setForm((prev) => ({ ...prev, location_name: query }));
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
-    if (query.length < 3) { setSuggestions([]); return; }
+    if (query.length < 3) { setSuggestions([]); setSuggestionsLoading(false); return; }
+    setSuggestionsLoading(true);
     searchTimeoutRef.current = setTimeout(async () => {
-      setSuggestionsLoading(true);
       try {
         const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&addressdetails=1&limit=5&countrycodes=zw`
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query + ' Zimbabwe')}&format=json&limit=5`
         );
-        setSuggestions(await res.json());
-      } catch { setSuggestions([]); }
+        if (!res.ok) throw new Error('API error');
+        const data = await res.json();
+        setSuggestions(Array.isArray(data) ? data : []);
+      } catch {
+        setSuggestions([]);
+      }
       setSuggestionsLoading(false);
-    }, 400);
+    }, 500);
   };
 
   const selectSuggestion = (s) => {
