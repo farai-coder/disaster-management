@@ -7,32 +7,41 @@ from models import Notification, AuthorityType, IncidentCategory
 
 # Maps incident categories to responsible authority types
 CATEGORY_AUTHORITY_MAP = {
-    IncidentCategory.CRIME: AuthorityType.POLICE,
-    IncidentCategory.FIRE: AuthorityType.FIRE_DEPARTMENT,
-    IncidentCategory.ACCIDENT: AuthorityType.POLICE,
-    IncidentCategory.DISEASE_OUTBREAK: AuthorityType.HEALTH,
-    IncidentCategory.CYCLONE_FLOOD: AuthorityType.CIVIL_PROTECTION,
-    IncidentCategory.DROUGHT: AuthorityType.CIVIL_PROTECTION,
-    IncidentCategory.OTHER: AuthorityType.ADMIN,
+    IncidentCategory.CRIME: [AuthorityType.POLICE],
+    IncidentCategory.FIRE: [AuthorityType.FIRE_DEPARTMENT],
+    IncidentCategory.ACCIDENT: [AuthorityType.POLICE, AuthorityType.HEALTH],
+    IncidentCategory.DISEASE_OUTBREAK: [AuthorityType.HEALTH],
+    IncidentCategory.CYCLONE_FLOOD: [AuthorityType.CIVIL_PROTECTION],
+    IncidentCategory.DROUGHT: [AuthorityType.CIVIL_PROTECTION],
+    IncidentCategory.OTHER: [AuthorityType.ADMIN],
 }
 
 
+def get_responsible_authorities(category: IncidentCategory) -> list[AuthorityType]:
+    return CATEGORY_AUTHORITY_MAP.get(category, [AuthorityType.ADMIN])
+
+
 def get_responsible_authority(category: IncidentCategory) -> AuthorityType:
-    return CATEGORY_AUTHORITY_MAP.get(category, AuthorityType.ADMIN)
+    authorities = get_responsible_authorities(category)
+    return authorities[0] if authorities else AuthorityType.ADMIN
 
 
-def create_incident_notification(db: Session, incident) -> Notification:
-    authority = get_responsible_authority(incident.category)
-    notification = Notification(
-        incident_id=incident.id,
-        message=f"New {incident.category.value} incident reported: {incident.title}",
-        notification_type="new_incident",
-        target_authority_type=authority,
-    )
-    db.add(notification)
+def create_incident_notification(db: Session, incident) -> list[Notification]:
+    authorities = get_responsible_authorities(incident.category)
+    notifications = []
+    for authority in authorities:
+        notification = Notification(
+            incident_id=incident.id,
+            message=f"New {incident.category.value} incident reported: {incident.title}",
+            notification_type="new_incident",
+            target_authority_type=authority,
+        )
+        db.add(notification)
+        notifications.append(notification)
     db.commit()
-    db.refresh(notification)
-    return notification
+    for n in notifications:
+        db.refresh(n)
+    return notifications
 
 
 def create_status_notification(db: Session, incident) -> Notification:

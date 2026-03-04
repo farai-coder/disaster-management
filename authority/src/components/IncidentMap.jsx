@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -47,7 +48,19 @@ function createColoredIcon(color) {
 const ZIMBABWE_CENTER = [-19.015438, 29.154857];
 const DEFAULT_ZOOM = 7;
 
+function RecenterMap({ center }) {
+  const map = useMap();
+  useEffect(() => {
+    if (center) map.setView(center, map.getZoom());
+  }, [center, map]);
+  return null;
+}
+
 export default function IncidentMap({ incidents = [], center, zoom, onIncidentClick, height = '500px' }) {
+  const validIncidents = incidents.filter(
+    (i) => i.latitude != null && i.longitude != null && isFinite(i.latitude) && isFinite(i.longitude)
+  );
+
   return (
     <MapContainer
       center={center || ZIMBABWE_CENTER}
@@ -58,7 +71,8 @@ export default function IncidentMap({ incidents = [], center, zoom, onIncidentCl
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
-      {incidents.map((incident) => (
+      {center && <RecenterMap center={center} />}
+      {validIncidents.map((incident) => (
         <Marker
           key={incident.id}
           position={[incident.latitude, incident.longitude]}

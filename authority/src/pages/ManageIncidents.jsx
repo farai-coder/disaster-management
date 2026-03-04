@@ -122,6 +122,7 @@ export default function ManageIncidents() {
               <thead>
                 <tr>
                   <th>ID</th>
+                  <th>Photo</th>
                   <th>Title</th>
                   <th>Category</th>
                   <th>Status</th>
@@ -134,6 +135,20 @@ export default function ManageIncidents() {
                 {incidents.map((inc) => (
                   <tr key={inc.id} className={selected?.id === inc.id ? 'selected-row' : ''}>
                     <td>#{inc.id}</td>
+                    <td>
+                      {inc.photo_url ? (
+                        <img
+                          src={`${UPLOAD_BASE}${inc.photo_url}`}
+                          alt="Incident"
+                          style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 6, cursor: 'pointer' }}
+                          onClick={() => setSelected(inc)}
+                        />
+                      ) : (
+                        <div style={{ width: 48, height: 48, background: '#f3f4f6', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', fontSize: '0.7rem' }}>
+                          No img
+                        </div>
+                      )}
+                    </td>
                     <td>
                       <button className="link-btn" onClick={() => setSelected(inc)}>
                         {inc.title}

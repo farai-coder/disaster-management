@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import Optional
@@ -39,6 +41,9 @@ def list_alerts(
     query = db.query(Alert).order_by(Alert.created_at.desc())
     if active_only:
         query = query.filter(Alert.is_active == True)
+        query = query.filter(
+            (Alert.expires_at == None) | (Alert.expires_at > datetime.now(timezone.utc))
+        )
     if severity:
         query = query.filter(Alert.severity == severity)
     return query.limit(limit).all()

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getAlerts } from '../services/api';
-import { Bell, AlertTriangle, Info, ShieldAlert } from 'lucide-react';
+import { Bell, AlertTriangle, Info, ShieldAlert, RefreshCw } from 'lucide-react';
 
 const SEVERITY_CONFIG = {
   critical: { icon: ShieldAlert, color: '#dc2626', bg: '#fef2f2' },
@@ -12,20 +12,24 @@ const SEVERITY_CONFIG = {
 export default function ViewAlerts() {
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [severityFilter, setSeverityFilter] = useState('');
 
+  const fetchAlerts = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const params = { active_only: true };
+      if (severityFilter) params.severity = severityFilter;
+      const res = await getAlerts(params);
+      setAlerts(res.data);
+    } catch {
+      setError('Failed to load alerts. Please check your connection and try again.');
+    }
+    setLoading(false);
+  };
+
   useEffect(() => {
-    const fetchAlerts = async () => {
-      try {
-        const params = { active_only: true };
-        if (severityFilter) params.severity = severityFilter;
-        const res = await getAlerts(params);
-        setAlerts(res.data);
-      } catch {
-        // ignore
-      }
-      setLoading(false);
-    };
     fetchAlerts();
   }, [severityFilter]);
 
@@ -44,7 +48,13 @@ export default function ViewAlerts() {
           <option value="medium">Medium</option>
           <option value="low">Low</option>
         </select>
+        <button className="btn btn-secondary" onClick={fetchAlerts} disabled={loading} style={{ marginLeft: 8 }}>
+          <RefreshCw size={16} />
+          Refresh
+        </button>
       </div>
+
+      {error && <div className="alert alert-error">{error}</div>}
 
       {loading ? (
         <p>Loading alerts...</p>

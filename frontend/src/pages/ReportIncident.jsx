@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MapPin, Upload, Send, Eye, EyeOff, Loader } from 'lucide-react';
 import { createIncident, classifyImage } from '../services/api';
@@ -34,6 +34,10 @@ export default function ReportIncident() {
   const [geoLoading, setGeoLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [suggestions, setSuggestions] = useState([]);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const searchTimeoutRef = useRef(null);
+  const suggestionsRef = useRef(null);
 
   const detectLocation = () => {
     if (!navigator.geolocation) return;
@@ -55,6 +59,42 @@ export default function ReportIncident() {
     detectLocation();
   }, []);
 
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (suggestionsRef.current && !suggestionsRef.current.contains(e.target)) {
+        setSuggestions([]);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const searchLocation = (query) => {
+    setForm((prev) => ({ ...prev, location_name: query }));
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    if (query.length < 3) { setSuggestions([]); return; }
+    searchTimeoutRef.current = setTimeout(async () => {
+      setSuggestionsLoading(true);
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&addressdetails=1&limit=5&countrycodes=zw`
+        );
+        setSuggestions(await res.json());
+      } catch { setSuggestions([]); }
+      setSuggestionsLoading(false);
+    }, 400);
+  };
+
+  const selectSuggestion = (s) => {
+    setForm((prev) => ({
+      ...prev,
+      location_name: s.display_name,
+      latitude: parseFloat(s.lat),
+      longitude: parseFloat(s.lon),
+    }));
+    setSuggestions([]);
+  };
+
   const handlePhotoChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -72,8 +112,8 @@ export default function ReportIncident() {
     }
   };
 
-  const handleMapClick = (incident) => {
-    // Used for picking location from map - not from incident click
+  const handleMapClick = ({ lat, lng }) => {
+    setForm((prev) => ({ ...prev, latitude: lat, longitude: lng }));
   };
 
   const handleSubmit = async (e) => {
@@ -192,14 +232,37 @@ export default function ReportIncident() {
           <div className="form-section">
             <h3>Location</h3>
 
-            <div className="form-group">
+            <div className="form-group" style={{ position: 'relative' }} ref={suggestionsRef}>
               <label>Location Name</label>
               <input
                 type="text"
                 value={form.location_name}
-                onChange={(e) => setForm({ ...form, location_name: e.target.value })}
+                onChange={(e) => searchLocation(e.target.value)}
                 placeholder="e.g. Corner of Samora Machel & J. Nkomo"
+                autoComplete="off"
               />
+              {suggestionsLoading && (
+                <div style={{ fontSize: '0.8rem', color: '#9ca3af', marginTop: 4 }}>Searching...</div>
+              )}
+              {suggestions.length > 0 && (
+                <ul style={{
+                  position: 'absolute', top: '100%', left: 0, right: 0, background: 'white',
+                  border: '1.5px solid #e5e7eb', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                  listStyle: 'none', margin: 0, padding: 0, zIndex: 1000, maxHeight: 220, overflowY: 'auto',
+                }}>
+                  {suggestions.map((s) => (
+                    <li
+                      key={s.place_id}
+                      onClick={() => selectSuggestion(s)}
+                      style={{ padding: '10px 14px', cursor: 'pointer', fontSize: '0.875rem', borderBottom: '1px solid #f3f4f6' }}
+                      onMouseEnter={(e) => (e.target.style.background = '#f9fafb')}
+                      onMouseLeave={(e) => (e.target.style.background = 'white')}
+                    >
+                      {s.display_name}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
 
             <div className="form-row">
@@ -234,6 +297,7 @@ export default function ReportIncident() {
                 center={[form.latitude, form.longitude]}
                 zoom={13}
                 height="250px"
+                onMapClick={handleMapClick}
               />
             </div>
 
