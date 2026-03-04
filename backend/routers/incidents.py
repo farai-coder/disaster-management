@@ -6,10 +6,10 @@ from sqlalchemy.orm import Session
 from typing import Optional
 
 from database import get_db
-from models import Incident, IncidentCategory, IncidentStatus
+from models import Incident, IncidentCategory, IncidentStatus, AuthorityType
 from schemas import IncidentCreate, IncidentUpdate, IncidentResponse
 from services.image_classifier import classify_image
-from services.notification import create_incident_notification, get_responsible_authority
+from services.notification import create_incident_notification, get_responsible_authority, get_responsible_authorities, CATEGORY_AUTHORITY_MAP
 
 router = APIRouter(prefix="/api/incidents", tags=["Incidents"])
 
@@ -85,7 +85,18 @@ def list_incidents(
     if status:
         query = query.filter(Incident.status == status)
     if authority:
-        query = query.filter(Incident.assigned_authority == authority)
+        # Show incidents where this authority is responsible (including shared categories like accidents)
+        try:
+            auth_type = AuthorityType(authority)
+            relevant_categories = [
+                cat for cat, auths in CATEGORY_AUTHORITY_MAP.items()
+                if auth_type in auths
+            ]
+            query = query.filter(
+                (Incident.assigned_authority == authority) | (Incident.category.in_(relevant_categories))
+            )
+        except ValueError:
+            query = query.filter(Incident.assigned_authority == authority)
     return query.offset(offset).limit(limit).all()
 
 
