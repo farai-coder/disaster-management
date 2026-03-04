@@ -46,51 +46,35 @@ export default function ReportIncident() {
     }
     setError('');
     setGeoLoading(true);
-
-    const onSuccess = async (pos) => {
-      const lat = pos.coords.latitude;
-      const lon = pos.coords.longitude;
-      setForm((prev) => ({ ...prev, latitude: lat, longitude: lon }));
-      try {
-        const res = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&zoom=18`
-        );
-        if (res.ok) {
-          const data = await res.json();
-          if (data.display_name) {
-            setForm((prev) => ({ ...prev, location_name: data.display_name }));
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const lat = pos.coords.latitude;
+        const lon = pos.coords.longitude;
+        setForm((prev) => ({ ...prev, latitude: lat, longitude: lon }));
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&zoom=18`
+          );
+          if (res.ok) {
+            const data = await res.json();
+            if (data.display_name) {
+              setForm((prev) => ({ ...prev, location_name: data.display_name }));
+            }
           }
-        }
-      } catch { /* ignore reverse geocode failure */ }
-      setGeoLoading(false);
-    };
-
-    const onError = (err) => {
-      // If high accuracy fails, retry without it
-      if (err.code === 2 || err.code === 3) {
-        navigator.geolocation.getCurrentPosition(
-          onSuccess,
-          (err2) => {
-            setGeoLoading(false);
-            if (err2.code === 1) setError('Location permission denied. Please allow location access in your browser settings.');
-            else setError('Location unavailable. Please enter your location manually.');
-          },
-          { enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 }
-        );
-        return;
-      }
-      setGeoLoading(false);
-      if (err.code === 1) setError('Location permission denied. Please allow location access in your browser settings.');
-      else setError('Location unavailable. Please enter your location manually.');
-    };
-
-    navigator.geolocation.getCurrentPosition(onSuccess, onError, {
-      enableHighAccuracy: true, timeout: 5000, maximumAge: 60000,
-    });
+        } catch { /* ignore */ }
+        setGeoLoading(false);
+      },
+      (err) => {
+        setGeoLoading(false);
+        if (err.code === 1) setError('Location permission denied. Please allow location access in your browser settings.');
+        else setError('Could not get your location. Please enter it manually.');
+      },
+      { timeout: 15000 }
+    );
   };
 
   useEffect(() => {
-    detectLocation();
+    // Don't auto-detect on load - let the user click the button
   }, []);
 
   useEffect(() => {
@@ -111,17 +95,10 @@ export default function ReportIncident() {
     searchTimeoutRef.current = setTimeout(async () => {
       try {
         const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?street=${encodeURIComponent(query)}&city=&country=Zimbabwe&format=json&addressdetails=1&limit=7`
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&addressdetails=1&limit=7&countrycodes=zw&viewbox=25.2,-22.4,33.1,-15.6&bounded=1`
         );
         if (!res.ok) throw new Error('API error');
-        let data = await res.json();
-        // If street search returns nothing, fall back to general search
-        if (!data.length) {
-          const res2 = await fetch(
-            `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&country=Zimbabwe&format=json&addressdetails=1&limit=7`
-          );
-          if (res2.ok) data = await res2.json();
-        }
+        const data = await res.json();
         setSuggestions(Array.isArray(data) ? data : []);
       } catch {
         setSuggestions([]);
