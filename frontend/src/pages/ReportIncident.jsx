@@ -40,18 +40,36 @@ export default function ReportIncident() {
   const suggestionsRef = useRef(null);
 
   const detectLocation = () => {
-    if (!navigator.geolocation) return;
+    if (!navigator.geolocation) {
+      setError('Geolocation is not supported by your browser.');
+      return;
+    }
     setGeoLoading(true);
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setForm((prev) => ({
-          ...prev,
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-        }));
+      async (pos) => {
+        const lat = pos.coords.latitude;
+        const lon = pos.coords.longitude;
+        setForm((prev) => ({ ...prev, latitude: lat, longitude: lon }));
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`
+          );
+          if (res.ok) {
+            const data = await res.json();
+            if (data.display_name) {
+              setForm((prev) => ({ ...prev, location_name: data.display_name }));
+            }
+          }
+        } catch { /* ignore reverse geocode failure */ }
         setGeoLoading(false);
       },
-      () => setGeoLoading(false)
+      (err) => {
+        setGeoLoading(false);
+        if (err.code === 1) setError('Location permission denied. Please allow location access in your browser settings.');
+        else if (err.code === 2) setError('Location unavailable. Please enter your location manually.');
+        else setError('Location request timed out. Please try again or enter manually.');
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
     );
   };
 
