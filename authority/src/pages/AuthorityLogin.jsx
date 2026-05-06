@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { loginAuthority } from '../services/api';
-import { Shield, LogIn, Loader } from 'lucide-react';
+import { Shield, LogIn, Loader, UserPlus } from 'lucide-react';
 
 export default function AuthorityLogin() {
   const navigate = useNavigate();
@@ -87,7 +87,7 @@ export default function AuthorityLogin() {
               Police
             </button>
             <button onClick={() => quickLogin('fire_admin')} className="btn btn-outline">
-              Fire Dept
+              Fire Brigade
             </button>
             <button onClick={() => quickLogin('health_admin')} className="btn btn-outline">
               Health
@@ -95,13 +95,11 @@ export default function AuthorityLogin() {
             <button onClick={() => quickLogin('civil_admin')} className="btn btn-outline">
               Civil Protection
             </button>
-            <button onClick={() => quickLogin('admin')} className="btn btn-outline">
-              Admin
-            </button>
           </div>
         </div>
 
-        <div className="login-back-link">
+        <div className="login-back-link" style={{ display: 'flex', justifyContent: 'space-between', marginTop: 12 }}>
+          <Link to="/signup"><UserPlus size={14} /> Create authority account</Link>
           <a href="http://localhost:5173/">Back to Public Portal</a>
         </div>
       </div>

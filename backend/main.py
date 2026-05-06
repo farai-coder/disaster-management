@@ -18,6 +18,13 @@ def seed_default_authorities():
     """Seed default authority accounts for demo."""
     db = SessionLocal()
     try:
+        # Remove any pre-existing admin accounts (admin role no longer used)
+        admin_accounts = db.query(Authority).filter(Authority.authority_type == AuthorityType.ADMIN).all()
+        for acc in admin_accounts:
+            db.delete(acc)
+        if admin_accounts:
+            db.commit()
+
         if db.query(Authority).count() > 0:
             return
 
@@ -26,7 +33,6 @@ def seed_default_authorities():
             {"username": "fire_admin", "name": "Fire & Rescue HQ", "authority_type": AuthorityType.FIRE_DEPARTMENT, "department": "City Fire Department"},
             {"username": "health_admin", "name": "MoH Command Center", "authority_type": AuthorityType.HEALTH, "department": "Ministry of Health"},
             {"username": "civil_admin", "name": "Civil Protection Unit", "authority_type": AuthorityType.CIVIL_PROTECTION, "department": "Civil Protection"},
-            {"username": "admin", "name": "System Administrator", "authority_type": AuthorityType.ADMIN, "department": "System"},
         ]
         for auth_data in defaults:
             authority = Authority(

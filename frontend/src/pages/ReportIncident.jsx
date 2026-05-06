@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapPin, Upload, Send, Eye, EyeOff, Loader } from 'lucide-react';
+import { MapPin, Upload, Send, Eye, EyeOff, Loader, Camera, Image as ImageIcon } from 'lucide-react';
 import { createIncident, classifyImage } from '../services/api';
 import IncidentMap from '../components/IncidentMap';
 
@@ -13,6 +13,12 @@ const CATEGORIES = [
   { value: 'drought', label: 'Drought' },
   { value: 'other', label: 'Other' },
 ];
+
+// Rough Zimbabwe bounding box for client-side coordinate validation
+const ZW_BBOX = { minLat: -22.5, maxLat: -15.5, minLon: 25.0, maxLon: 33.2 };
+
+const isInsideZimbabwe = (lat, lon) =>
+  lat >= ZW_BBOX.minLat && lat <= ZW_BBOX.maxLat && lon >= ZW_BBOX.minLon && lon <= ZW_BBOX.maxLon;
 
 export default function ReportIncident() {
   const navigate = useNavigate();
@@ -36,8 +42,11 @@ export default function ReportIncident() {
   const [success, setSuccess] = useState('');
   const [suggestions, setSuggestions] = useState([]);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({});
   const searchTimeoutRef = useRef(null);
   const suggestionsRef = useRef(null);
+  const cameraRef = useRef(null);
+  const galleryRef = useRef(null);
 
   const detectLocation = () => {
     if (!navigator.geolocation) {
@@ -69,13 +78,9 @@ export default function ReportIncident() {
         if (err.code === 1) setError('Location permission denied. Please allow location access in your browser settings.');
         else setError('Could not get your location. Please enter it manually.');
       },
-      { timeout: 15000 }
+      { timeout: 15000, enableHighAccuracy: true }
     );
   };
-
-  useEffect(() => {
-    // Don't auto-detect on load - let the user click the button
-  }, []);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -104,7 +109,7 @@ export default function ReportIncident() {
         setSuggestions([]);
       }
       setSuggestionsLoading(false);
-    }, 500);
+    }, 400);
   };
 
   const selectSuggestion = (s) => {
@@ -117,8 +122,7 @@ export default function ReportIncident() {
     setSuggestions([]);
   };
 
-  const handlePhotoChange = async (e) => {
-    const file = e.target.files[0];
+  const handlePhotoChange = async (file) => {
     if (!file) return;
     setPhoto(file);
     setPhotoPreview(URL.createObjectURL(file));
@@ -138,15 +142,44 @@ export default function ReportIncident() {
     setForm((prev) => ({ ...prev, latitude: lat, longitude: lng }));
   };
 
+  const validate = () => {
+    const errs = {};
+    if (!form.title.trim() || form.title.trim().length < 3) errs.title = 'Title must be at least 3 characters';
+    if (!form.description.trim() || form.description.trim().length < 10) errs.description = 'Description must be at least 10 characters';
+    if (!form.category) errs.category = 'Please choose a category';
+    if (form.latitude == null || form.longitude == null || isNaN(form.latitude) || isNaN(form.longitude)) {
+      errs.location = 'Pick a location on the map or use your current location';
+    } else if (!isInsideZimbabwe(form.latitude, form.longitude)) {
+      errs.location = 'Location must be within Zimbabwe';
+    }
+    if (!form.is_anonymous) {
+      if (!form.reporter_name.trim()) errs.reporter_name = 'Name is required for non-anonymous reports';
+      if (!form.reporter_contact.trim()) {
+        errs.reporter_contact = 'Phone or email is required';
+      } else {
+        const v = form.reporter_contact.trim();
+        const isPhone = /^[+\d][\d\s-]{6,}$/.test(v);
+        const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+        if (!isPhone && !isEmail) errs.reporter_contact = 'Enter a valid phone number or email address';
+      }
+    }
+    setFieldErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    if (!validate()) {
+      setError('Please fix the highlighted errors.');
+      return;
+    }
     setLoading(true);
 
     try {
       const fd = new FormData();
-      fd.append('title', form.title);
-      fd.append('description', form.description);
+      fd.append('title', form.title.trim());
+      fd.append('description', form.description.trim());
       fd.append('category', form.category);
       fd.append('latitude', form.latitude);
       fd.append('longitude', form.longitude);
@@ -162,7 +195,7 @@ export default function ReportIncident() {
 
       const res = await createIncident(fd);
       setSuccess(`Incident reported successfully! Reference ID: #${res.data.id}`);
-      setTimeout(() => navigate('/track', { state: { incidentId: res.data.id } }), 2000);
+      setTimeout(() => navigate('/track', { state: { incidentId: res.data.id } }), 1800);
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to submit report');
     } finally {
@@ -174,44 +207,49 @@ export default function ReportIncident() {
     <div className="page report-page">
       <h1>Report an Incident</h1>
       <p className="page-subtitle">
-        Submit a geo-tagged report. You can remain anonymous.
+        Submit a geo-tagged report. Fields marked <span style={{ color: 'var(--danger)' }}>*</span> are mandatory. You can remain anonymous.
       </p>
 
       {error && <div className="alert alert-error">{error}</div>}
       {success && <div className="alert alert-success">{success}</div>}
 
-      <form onSubmit={handleSubmit} className="report-form">
+      <form onSubmit={handleSubmit} className="report-form" noValidate>
         <div className="form-grid">
           <div className="form-section">
             <h3>Incident Details</h3>
 
             <div className="form-group">
-              <label>Title *</label>
+              <label>Title <span className="req">*</span></label>
               <input
                 type="text"
                 value={form.title}
                 onChange={(e) => setForm({ ...form, title: e.target.value })}
                 placeholder="Brief title of the incident"
+                aria-invalid={!!fieldErrors.title}
                 required
               />
+              {fieldErrors.title && <p className="field-error">{fieldErrors.title}</p>}
             </div>
 
             <div className="form-group">
-              <label>Description *</label>
+              <label>Description <span className="req">*</span></label>
               <textarea
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
                 placeholder="Describe what happened in detail..."
                 rows={4}
+                aria-invalid={!!fieldErrors.description}
                 required
               />
+              {fieldErrors.description && <p className="field-error">{fieldErrors.description}</p>}
             </div>
 
             <div className="form-group">
-              <label>Category *</label>
+              <label>Category <span className="req">*</span></label>
               <select
                 value={form.category}
                 onChange={(e) => setForm({ ...form, category: e.target.value })}
+                aria-invalid={!!fieldErrors.category}
                 required
               >
                 <option value="">Select category...</option>
@@ -221,6 +259,7 @@ export default function ReportIncident() {
                   </option>
                 ))}
               </select>
+              {fieldErrors.category && <p className="field-error">{fieldErrors.category}</p>}
               {aiSuggestion && (
                 <div className="ai-suggestion">
                   AI suggests: <strong>{aiSuggestion.suggested_category.replace('_', ' ')}</strong>
@@ -237,14 +276,36 @@ export default function ReportIncident() {
             </div>
 
             <div className="form-group">
-              <label>Upload Photo</label>
-              <div className="file-upload">
-                <input type="file" accept="image/*" onChange={handlePhotoChange} id="photo-upload" />
-                <label htmlFor="photo-upload" className="file-upload-label">
-                  <Upload size={20} />
-                  <span>{photo ? photo.name : 'Choose a photo...'}</span>
-                </label>
+              <label>Photo (optional)</label>
+              <input
+                ref={cameraRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={(e) => handlePhotoChange(e.target.files?.[0])}
+                style={{ display: 'none' }}
+              />
+              <input
+                ref={galleryRef}
+                type="file"
+                accept="image/*"
+                onChange={(e) => handlePhotoChange(e.target.files?.[0])}
+                style={{ display: 'none' }}
+              />
+              <div className="photo-source-buttons">
+                <button type="button" className="btn btn-secondary" onClick={() => cameraRef.current?.click()}>
+                  <Camera size={16} /> Take Photo
+                </button>
+                <button type="button" className="btn btn-secondary" onClick={() => galleryRef.current?.click()}>
+                  <ImageIcon size={16} /> Choose from Gallery / Files
+                </button>
+                {photo && (
+                  <button type="button" className="btn btn-outline" onClick={() => { setPhoto(null); setPhotoPreview(null); setAiSuggestion(null); }}>
+                    Remove
+                  </button>
+                )}
               </div>
+              {photo && <p className="file-name-hint">{photo.name}</p>}
               {photoPreview && (
                 <img src={photoPreview} alt="Preview" className="photo-preview" />
               )}
@@ -252,7 +313,7 @@ export default function ReportIncident() {
           </div>
 
           <div className="form-section">
-            <h3>Location</h3>
+            <h3>Location <span className="req">*</span></h3>
 
             <div className="form-group" style={{ position: 'relative' }} ref={suggestionsRef}>
               <label>Location Name</label>
@@ -260,26 +321,16 @@ export default function ReportIncident() {
                 type="text"
                 value={form.location_name}
                 onChange={(e) => searchLocation(e.target.value)}
-                placeholder="e.g. Corner of Samora Machel & J. Nkomo"
+                placeholder="Start typing a place in Zimbabwe..."
                 autoComplete="off"
               />
               {suggestionsLoading && (
                 <div style={{ fontSize: '0.8rem', color: '#9ca3af', marginTop: 4 }}>Searching...</div>
               )}
               {suggestions.length > 0 && (
-                <ul style={{
-                  position: 'absolute', top: '100%', left: 0, right: 0, background: 'white',
-                  border: '1.5px solid #e5e7eb', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                  listStyle: 'none', margin: 0, padding: 0, zIndex: 1000, maxHeight: 220, overflowY: 'auto',
-                }}>
+                <ul className="location-suggestions">
                   {suggestions.map((s) => (
-                    <li
-                      key={s.place_id}
-                      onClick={() => selectSuggestion(s)}
-                      style={{ padding: '10px 14px', cursor: 'pointer', fontSize: '0.875rem', borderBottom: '1px solid #f3f4f6' }}
-                      onMouseEnter={(e) => (e.target.style.background = '#f9fafb')}
-                      onMouseLeave={(e) => (e.target.style.background = 'white')}
-                    >
+                    <li key={s.place_id} onClick={() => selectSuggestion(s)}>
                       {s.display_name}
                     </li>
                   ))}
@@ -287,7 +338,12 @@ export default function ReportIncident() {
               )}
             </div>
 
-            <div className="form-row">
+            <button type="button" className="btn btn-primary" onClick={detectLocation} disabled={geoLoading}>
+              <MapPin size={16} />
+              {geoLoading ? 'Detecting...' : 'Use My Current Location'}
+            </button>
+
+            <div className="form-row" style={{ marginTop: 12 }}>
               <div className="form-group">
                 <label>Latitude</label>
                 <input
@@ -308,17 +364,15 @@ export default function ReportIncident() {
               </div>
             </div>
 
-            <button type="button" className="btn btn-secondary" onClick={detectLocation} disabled={geoLoading}>
-              <MapPin size={16} />
-              {geoLoading ? 'Detecting...' : 'Use My Location'}
-            </button>
+            {fieldErrors.location && <p className="field-error">{fieldErrors.location}</p>}
 
-            <div className="map-picker" style={{ marginTop: 12 }}>
+            <p className="map-hint">Tap on the map below to fine-tune the location.</p>
+            <div className="map-picker" style={{ marginTop: 6 }}>
               <IncidentMap
                 incidents={[{ id: 0, latitude: form.latitude, longitude: form.longitude, title: 'Report Location', category: form.category || 'other', status: 'pending', description: '', created_at: new Date().toISOString() }]}
                 center={[form.latitude, form.longitude]}
                 zoom={13}
-                height="250px"
+                height="260px"
                 onMapClick={handleMapClick}
               />
             </div>
@@ -340,22 +394,26 @@ export default function ReportIncident() {
             {!form.is_anonymous && (
               <>
                 <div className="form-group">
-                  <label>Your Name</label>
+                  <label>Your Name <span className="req">*</span></label>
                   <input
                     type="text"
                     value={form.reporter_name}
                     onChange={(e) => setForm({ ...form, reporter_name: e.target.value })}
                     placeholder="Full name"
+                    aria-invalid={!!fieldErrors.reporter_name}
                   />
+                  {fieldErrors.reporter_name && <p className="field-error">{fieldErrors.reporter_name}</p>}
                 </div>
                 <div className="form-group">
-                  <label>Contact (Phone/Email)</label>
+                  <label>Contact (Phone or Email) <span className="req">*</span></label>
                   <input
                     type="text"
                     value={form.reporter_contact}
                     onChange={(e) => setForm({ ...form, reporter_contact: e.target.value })}
-                    placeholder="Phone number or email"
+                    placeholder="e.g. +263 77 123 4567 or you@example.com"
+                    aria-invalid={!!fieldErrors.reporter_contact}
                   />
+                  {fieldErrors.reporter_contact && <p className="field-error">{fieldErrors.reporter_contact}</p>}
                 </div>
               </>
             )}

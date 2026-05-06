@@ -29,6 +29,13 @@ const STATUS_LABELS = {
   fake: 'Marked Fake',
 };
 
+const AUTHORITY_ICON_COLORS = {
+  police: '#1d4ed8',
+  fire_department: '#b91c1c',
+  health: '#047857',
+  civil_protection: '#7c3aed',
+};
+
 function createColoredIcon(color) {
   return L.divIcon({
     className: 'custom-marker',
@@ -44,9 +51,40 @@ function createColoredIcon(color) {
   });
 }
 
-// Zimbabwe center coordinates
+function createOfficeIcon(color, label) {
+  return L.divIcon({
+    className: 'office-marker',
+    html: `<div style="
+      background: white;
+      border: 2.5px solid ${color};
+      color: ${color};
+      width: 26px; height: 26px;
+      border-radius: 6px;
+      display:flex; align-items:center; justify-content:center;
+      font-weight: 700; font-size: 11px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    ">${label}</div>`,
+    iconSize: [26, 26],
+    iconAnchor: [13, 13],
+  });
+}
+
+const officeLabel = (type) => ({
+  police: 'P',
+  fire_department: 'F',
+  health: 'H',
+  civil_protection: 'C',
+}[type] || '?');
+
+// Zimbabwe geography
 const ZIMBABWE_CENTER = [-19.015438, 29.154857];
 const DEFAULT_ZOOM = 7;
+const ZIMBABWE_BOUNDS = [
+  [-22.4, 25.2],
+  [-15.6, 33.1],
+];
+const MIN_ZOOM = 6;
+const MAX_ZOOM = 18;
 
 function RecenterMap({ center }) {
   const map = useMap();
@@ -56,7 +94,14 @@ function RecenterMap({ center }) {
   return null;
 }
 
-export default function IncidentMap({ incidents = [], center, zoom, onIncidentClick, height = '500px' }) {
+export default function IncidentMap({
+  incidents = [],
+  offices = [],
+  center,
+  zoom,
+  onIncidentClick,
+  height = '500px',
+}) {
   const validIncidents = incidents.filter(
     (i) => i.latitude != null && i.longitude != null && isFinite(i.latitude) && isFinite(i.longitude)
   );
@@ -65,16 +110,22 @@ export default function IncidentMap({ incidents = [], center, zoom, onIncidentCl
     <MapContainer
       center={center || ZIMBABWE_CENTER}
       zoom={zoom || DEFAULT_ZOOM}
+      minZoom={MIN_ZOOM}
+      maxZoom={MAX_ZOOM}
+      maxBounds={ZIMBABWE_BOUNDS}
+      maxBoundsViscosity={1.0}
       style={{ height, width: '100%', borderRadius: '8px' }}
     >
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        bounds={ZIMBABWE_BOUNDS}
+        noWrap
       />
       {center && <RecenterMap center={center} />}
       {validIncidents.map((incident) => (
         <Marker
-          key={incident.id}
+          key={`inc-${incident.id}`}
           position={[incident.latitude, incident.longitude]}
           icon={createColoredIcon(CATEGORY_COLORS[incident.category] || '#6b7280')}
           eventHandlers={{
@@ -91,7 +142,10 @@ export default function IncidentMap({ incidents = [], center, zoom, onIncidentCl
               <span className={`badge badge-status-${incident.status}`} style={{ marginLeft: 4 }}>
                 {STATUS_LABELS[incident.status]}
               </span>
-              <p style={{ margin: '8px 0 4px', fontSize: 13 }}>{incident.description.slice(0, 120)}...</p>
+              <p style={{ margin: '8px 0 4px', fontSize: 13 }}>
+                {(incident.description || '').slice(0, 120)}
+                {(incident.description || '').length > 120 ? '...' : ''}
+              </p>
               {incident.location_name && (
                 <p style={{ fontSize: 12, color: '#666' }}>{incident.location_name}</p>
               )}
@@ -102,8 +156,39 @@ export default function IncidentMap({ incidents = [], center, zoom, onIncidentCl
           </Popup>
         </Marker>
       ))}
+
+      {offices.map((office, idx) => {
+        const color = AUTHORITY_ICON_COLORS[office.type] || '#374151';
+        return (
+          <Marker
+            key={`office-${idx}-${office.name}`}
+            position={[office.latitude, office.longitude]}
+            icon={createOfficeIcon(color, officeLabel(office.type))}
+          >
+            <Popup>
+              <div style={{ minWidth: 180 }}>
+                <strong>{office.name}</strong>
+                <br />
+                <span style={{ fontSize: 12, color: '#555', textTransform: 'capitalize' }}>
+                  {office.type.replace('_', ' ')} &middot; {office.city}
+                </span>
+                {office.distance_km != null && (
+                  <p style={{ margin: '6px 0 2px', fontSize: 12 }}>
+                    {office.distance_km} km from incident
+                  </p>
+                )}
+                {office.phone && (
+                  <p style={{ margin: '2px 0', fontSize: 12 }}>
+                    📞 <a href={`tel:${office.phone}`}>{office.phone}</a>
+                  </p>
+                )}
+              </div>
+            </Popup>
+          </Marker>
+        );
+      })}
     </MapContainer>
   );
 }
 
-export { CATEGORY_COLORS, STATUS_LABELS, ZIMBABWE_CENTER };
+export { CATEGORY_COLORS, STATUS_LABELS, ZIMBABWE_CENTER, ZIMBABWE_BOUNDS, AUTHORITY_ICON_COLORS };

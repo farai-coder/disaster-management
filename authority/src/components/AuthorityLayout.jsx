@@ -1,14 +1,16 @@
 import { Outlet, Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import {
   Shield, Menu, X, ChevronLeft, ChevronRight, LogOut,
-  LayoutDashboard, FileText, PlusCircle, Bell, Map, Home,
+  LayoutDashboard, FileText, PlusCircle, Map, Home, BarChart3, Settings,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 const navItems = [
   { path: '/dashboard', label: 'Overview', icon: LayoutDashboard },
   { path: '/incidents', label: 'Manage Incidents', icon: FileText },
-  { path: '/alerts', label: 'Create Alert', icon: PlusCircle },
+  { path: '/alerts', label: 'Alerts & Issue New', icon: PlusCircle },
+  { path: '/reports', label: 'Reports', icon: BarChart3 },
+  { path: '/settings', label: 'Account Settings', icon: Settings },
 ];
 
 export default function AuthorityLayout() {
@@ -42,8 +44,10 @@ export default function AuthorityLayout() {
     navigate('/login');
   };
 
+  const authorityClass = authority ? `theme-${authority.authority_type}` : '';
+
   return (
-    <div className={`app-layout ${collapsed ? 'sidebar-collapsed' : ''}`}>
+    <div className={`app-layout ${collapsed ? 'sidebar-collapsed' : ''} ${authorityClass}`}>
       {mobileOpen && (
         <div className="sidebar-overlay" onClick={() => setMobileOpen(false)} />
       )}

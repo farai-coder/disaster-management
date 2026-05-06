@@ -5,6 +5,7 @@ import ReportIncident from './pages/ReportIncident';
 import LiveMap from './pages/LiveMap';
 import ViewAlerts from './pages/ViewAlerts';
 import TrackIncident from './pages/TrackIncident';
+import ResponderReport from './pages/ResponderReport';
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
           <Route path="/map" element={<LiveMap />} />
           <Route path="/alerts" element={<ViewAlerts />} />
           <Route path="/track" element={<TrackIncident />} />
+          <Route path="/respond/:incidentId" element={<ResponderReport />} />
         </Route>
       </Routes>
     </BrowserRouter>

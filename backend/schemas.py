@@ -92,6 +92,34 @@ class AuthorityLogin(BaseModel):
     password: str
 
 
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: str = Field(..., min_length=4)
+
+
+class IncidentReportCreate(BaseModel):
+    incident_id: int
+    responder_name: str = Field(..., min_length=2, max_length=120)
+    responder_authority: AuthorityType
+    outcome: str = Field(..., pattern="^(genuine|false_alarm|duplicate|resolved)$")
+    notes: Optional[str] = None
+    is_false_alarm: bool = False
+
+
+class IncidentReportResponse(BaseModel):
+    id: int
+    incident_id: int
+    responder_name: str
+    responder_authority: AuthorityType
+    arrived_at: Optional[datetime]
+    outcome: str
+    notes: Optional[str]
+    is_false_alarm: bool
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 class AuthorityResponse(BaseModel):
     id: int
     username: str

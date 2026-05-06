@@ -6,10 +6,11 @@ from sqlalchemy.orm import Session
 from typing import Optional
 
 from database import get_db
-from models import Incident, IncidentCategory, IncidentStatus, AuthorityType
-from schemas import IncidentCreate, IncidentUpdate, IncidentResponse
+from models import Incident, IncidentReport, IncidentCategory, IncidentStatus, AuthorityType
+from schemas import IncidentCreate, IncidentUpdate, IncidentResponse, IncidentReportCreate, IncidentReportResponse
 from services.image_classifier import classify_image
 from services.notification import create_incident_notification, get_responsible_authority, get_responsible_authorities, CATEGORY_AUTHORITY_MAP
+from services.authority_offices import nearest_offices
 
 router = APIRouter(prefix="/api/incidents", tags=["Incidents"])
 
@@ -148,3 +149,63 @@ async def classify_uploaded_image(
 ):
     result = classify_image(photo.filename, description)
     return result
+
+
+@router.get("/{incident_id}/nearest-authorities")
+def get_nearest_authorities(
+    incident_id: int,
+    limit: int = Query(5, ge=1, le=20),
+    db: Session = Depends(get_db),
+):
+    incident = db.query(Incident).filter(Incident.id == incident_id).first()
+    if not incident:
+        raise HTTPException(status_code=404, detail="Incident not found")
+    types = get_responsible_authorities(incident.category)
+    return {
+        "incident_id": incident.id,
+        "responsible_types": [t.value for t in types],
+        "offices": nearest_offices(incident.latitude, incident.longitude, types, limit=limit),
+    }
+
+
+@router.get("/{incident_id}/reports", response_model=list[IncidentReportResponse])
+def list_incident_reports(incident_id: int, db: Session = Depends(get_db)):
+    return (
+        db.query(IncidentReport)
+        .filter(IncidentReport.incident_id == incident_id)
+        .order_by(IncidentReport.created_at.desc())
+        .all()
+    )
+
+
+@router.post("/{incident_id}/reports", response_model=IncidentReportResponse)
+def create_incident_report(
+    incident_id: int,
+    payload: IncidentReportCreate,
+    db: Session = Depends(get_db),
+):
+    incident = db.query(Incident).filter(Incident.id == incident_id).first()
+    if not incident:
+        raise HTTPException(status_code=404, detail="Incident not found")
+    if payload.incident_id != incident_id:
+        raise HTTPException(status_code=400, detail="incident_id mismatch")
+
+    report = IncidentReport(
+        incident_id=incident_id,
+        responder_name=payload.responder_name,
+        responder_authority=payload.responder_authority,
+        outcome=payload.outcome,
+        notes=payload.notes,
+        is_false_alarm=payload.is_false_alarm or payload.outcome == "false_alarm",
+    )
+    db.add(report)
+
+    # If responder flagged false alarm, update incident status to fake
+    if report.is_false_alarm:
+        incident.status = IncidentStatus.FAKE
+    elif payload.outcome == "resolved":
+        incident.status = IncidentStatus.RESOLVED
+
+    db.commit()
+    db.refresh(report)
+    return report

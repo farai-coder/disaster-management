@@ -93,3 +93,18 @@ class Notification(Base):
     is_read = Column(Boolean, default=False)
     target_authority_type = Column(SAEnum(AuthorityType), nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+class IncidentReport(Base):
+    """Responder feedback after attending an incident."""
+    __tablename__ = "incident_reports"
+
+    id = Column(Integer, primary_key=True, index=True)
+    incident_id = Column(Integer, nullable=False, index=True)
+    responder_name = Column(String(120), nullable=False)
+    responder_authority = Column(SAEnum(AuthorityType), nullable=False)
+    arrived_at = Column(DateTime, nullable=True)
+    outcome = Column(String(50), nullable=False)  # genuine, false_alarm, duplicate, resolved
+    notes = Column(Text, nullable=True)
+    is_false_alarm = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)

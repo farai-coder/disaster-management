@@ -1,16 +1,18 @@
 import { useState, useEffect } from 'react';
-import { getIncidents, updateIncident, deleteIncident, UPLOAD_BASE } from '../services/api';
+import { getIncidents, updateIncident, deleteIncident, getNearestAuthorities, getIncidentReports, UPLOAD_BASE } from '../services/api';
 import { CATEGORY_COLORS, STATUS_LABELS } from '../components/IncidentMap';
 import IncidentMap from '../components/IncidentMap';
 import {
   Filter, CheckCircle, XCircle, Loader,
-  Trash2, Eye, MapPin, Clock,
+  Trash2, Eye, MapPin, Clock, Phone,
 } from 'lucide-react';
 
 export default function ManageIncidents() {
   const [incidents, setIncidents] = useState([]);
   const [filter, setFilter] = useState({ category: '', status: '' });
   const [selected, setSelected] = useState(null);
+  const [nearby, setNearby] = useState([]);
+  const [responderReports, setResponderReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(null);
   const [viewMode, setViewMode] = useState('list');
@@ -23,7 +25,7 @@ export default function ManageIncidents() {
       const params = {};
       if (filter.category) params.category = filter.category;
       if (filter.status) params.status = filter.status;
-      if (authority.authority_type !== 'admin') {
+      if (authority.authority_type) {
         params.authority = authority.authority_type;
       }
       const res = await getIncidents(params);
@@ -37,6 +39,20 @@ export default function ManageIncidents() {
   useEffect(() => {
     fetchIncidents();
   }, [filter]);
+
+  const openIncident = async (inc) => {
+    setSelected(inc);
+    setNearby([]);
+    setResponderReports([]);
+    try {
+      const [authRes, reportsRes] = await Promise.all([
+        getNearestAuthorities(inc.id, 5),
+        getIncidentReports(inc.id),
+      ]);
+      setNearby(authRes.data.offices || []);
+      setResponderReports(reportsRes.data || []);
+    } catch { /* ignore */ }
+  };
 
   const handleStatusUpdate = async (id, status) => {
     setUpdating(id);
@@ -109,7 +125,7 @@ export default function ManageIncidents() {
         <IncidentMap
           incidents={incidents}
           height="calc(100vh - 280px)"
-          onIncidentClick={setSelected}
+          onIncidentClick={openIncident}
         />
       ) : (
         <div className="incidents-table-wrapper">
@@ -133,7 +149,12 @@ export default function ManageIncidents() {
               </thead>
               <tbody>
                 {incidents.map((inc) => (
-                  <tr key={inc.id} className={selected?.id === inc.id ? 'selected-row' : ''}>
+                  <tr
+                    key={inc.id}
+                    className={selected?.id === inc.id ? 'selected-row' : ''}
+                    onClick={() => openIncident(inc)}
+                    style={{ cursor: 'pointer' }}
+                  >
                     <td>#{inc.id}</td>
                     <td>
                       {inc.photo_url ? (
@@ -141,7 +162,8 @@ export default function ManageIncidents() {
                           src={`${UPLOAD_BASE}${inc.photo_url}`}
                           alt="Incident"
                           style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 6, cursor: 'pointer' }}
-                          onClick={() => setSelected(inc)}
+                          onClick={(e) => { e.stopPropagation(); openIncident(inc); }}
+                          title="Open incident details"
                         />
                       ) : (
                         <div style={{ width: 48, height: 48, background: '#f3f4f6', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', fontSize: '0.7rem' }}>
@@ -150,7 +172,7 @@ export default function ManageIncidents() {
                       )}
                     </td>
                     <td>
-                      <button className="link-btn" onClick={() => setSelected(inc)}>
+                      <button className="link-btn" onClick={(e) => { e.stopPropagation(); openIncident(inc); }}>
                         {inc.title}
                       </button>
                     </td>
@@ -169,7 +191,7 @@ export default function ManageIncidents() {
                     </td>
                     <td>{inc.location_name || `${inc.latitude.toFixed(4)}, ${inc.longitude.toFixed(4)}`}</td>
                     <td>{new Date(inc.created_at).toLocaleDateString()}</td>
-                    <td>
+                    <td onClick={(e) => e.stopPropagation()}>
                       <div className="action-buttons">
                         <button
                           className="btn btn-sm btn-success"
@@ -255,6 +277,47 @@ export default function ManageIncidents() {
             <p className="ai-label">AI Suggestion: {selected.ai_suggested_category.replace('_', ' ')}</p>
           )}
 
+          <div style={{ marginTop: 16 }}>
+            <h4>Location & Nearest Authorities</h4>
+            <IncidentMap
+              incidents={[selected]}
+              offices={nearby}
+              center={[selected.latitude, selected.longitude]}
+              zoom={11}
+              height="220px"
+            />
+            {nearby.length > 0 && (
+              <div className="nearby-list" style={{ marginTop: 10 }}>
+                {nearby.map((o, i) => (
+                  <div key={i} className="nearby-card">
+                    <div>
+                      <span className="nearby-name">{o.name}</span>
+                      <span className="nearby-meta">{o.type.replace('_', ' ')} · {o.city} · {o.distance_km} km</span>
+                    </div>
+                    {o.phone && (
+                      <a href={`tel:${o.phone}`} className="btn btn-sm btn-secondary">
+                        <Phone size={12} /> {o.phone}
+                      </a>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {responderReports.length > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <h4>Responder Reports</h4>
+              {responderReports.map((r) => (
+                <div key={r.id} className="responder-report">
+                  <p><strong>{r.responder_name}</strong> ({r.responder_authority.replace('_', ' ')}) — {r.outcome.replace('_', ' ')}</p>
+                  {r.notes && <p>{r.notes}</p>}
+                  <p className="detail-time">{new Date(r.created_at).toLocaleString()}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="detail-actions">
             <h4>Update Status:</h4>
             <div className="action-buttons">
@@ -268,6 +331,9 @@ export default function ManageIncidents() {
                   {STATUS_LABELS[s]}
                 </button>
               ))}
+              <button className="btn btn-sm btn-danger" onClick={() => handleDelete(selected.id)}>
+                <Trash2 size={12} /> Delete
+              </button>
             </div>
           </div>
         </div>

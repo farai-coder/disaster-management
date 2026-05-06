@@ -68,6 +68,16 @@ def deactivate_alert(alert_id: int, db: Session = Depends(get_db)):
     return alert
 
 
+@router.delete("/{alert_id}")
+def delete_alert(alert_id: int, db: Session = Depends(get_db)):
+    alert = db.query(Alert).filter(Alert.id == alert_id).first()
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    db.delete(alert)
+    db.commit()
+    return {"detail": "Alert deleted"}
+
+
 @router.post("/simulate-sms")
 def send_sms_alert(
     message: str = Query(...),

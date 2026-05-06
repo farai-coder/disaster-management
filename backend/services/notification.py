@@ -8,22 +8,22 @@ from models import Notification, AuthorityType, IncidentCategory
 # Maps incident categories to responsible authority types
 CATEGORY_AUTHORITY_MAP = {
     IncidentCategory.CRIME: [AuthorityType.POLICE],
-    IncidentCategory.FIRE: [AuthorityType.FIRE_DEPARTMENT],
+    IncidentCategory.FIRE: [AuthorityType.FIRE_DEPARTMENT, AuthorityType.HEALTH],
     IncidentCategory.ACCIDENT: [AuthorityType.POLICE, AuthorityType.HEALTH],
     IncidentCategory.DISEASE_OUTBREAK: [AuthorityType.HEALTH],
-    IncidentCategory.CYCLONE_FLOOD: [AuthorityType.CIVIL_PROTECTION],
+    IncidentCategory.CYCLONE_FLOOD: [AuthorityType.CIVIL_PROTECTION, AuthorityType.HEALTH],
     IncidentCategory.DROUGHT: [AuthorityType.CIVIL_PROTECTION],
-    IncidentCategory.OTHER: [AuthorityType.ADMIN],
+    IncidentCategory.OTHER: [AuthorityType.CIVIL_PROTECTION, AuthorityType.POLICE],
 }
 
 
 def get_responsible_authorities(category: IncidentCategory) -> list[AuthorityType]:
-    return CATEGORY_AUTHORITY_MAP.get(category, [AuthorityType.ADMIN])
+    return CATEGORY_AUTHORITY_MAP.get(category, [AuthorityType.CIVIL_PROTECTION])
 
 
 def get_responsible_authority(category: IncidentCategory) -> AuthorityType:
     authorities = get_responsible_authorities(category)
-    return authorities[0] if authorities else AuthorityType.ADMIN
+    return authorities[0] if authorities else AuthorityType.CIVIL_PROTECTION
 
 
 def create_incident_notification(db: Session, incident) -> list[Notification]:

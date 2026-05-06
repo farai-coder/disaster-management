@@ -59,4 +59,28 @@ export const getNotifications = (authorityType, unreadOnly = true) =>
 export const markNotificationRead = (id) =>
   api.patch(`/authorities/notifications/${id}/read`);
 
+export const changePassword = (authorityId, payload) =>
+  api.patch(`/authorities/${authorityId}/password`, payload);
+
+export const deleteAlert = (id) =>
+  api.delete(`/alerts/${id}`);
+
+export const getNearestAuthorities = (incidentId, limit = 5) =>
+  api.get(`/incidents/${incidentId}/nearest-authorities`, { params: { limit } });
+
+export const getNearestOffices = (lat, lon, authorityType, limit = 5) =>
+  api.get('/authorities/offices/nearest', { params: { lat, lon, authority_type: authorityType, limit } });
+
+export const getReportsSummary = (params = {}) =>
+  api.get('/authorities/reports/summary', { params });
+
+export const resetDemoData = () =>
+  api.delete('/authorities/demo/reset', { params: { confirm: true } });
+
+export const submitResponderReport = (incidentId, payload) =>
+  api.post(`/incidents/${incidentId}/reports`, payload);
+
+export const getIncidentReports = (incidentId) =>
+  api.get(`/incidents/${incidentId}/reports`);
+
 export const UPLOAD_BASE = 'http://localhost:8000';

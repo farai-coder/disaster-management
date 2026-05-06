@@ -1,8 +1,8 @@
-import { useState } from 'react';
-import { useLocation } from 'react-router-dom';
-import { getIncident } from '../services/api';
-import { STATUS_LABELS, CATEGORY_COLORS } from '../components/IncidentMap';
-import { Search, CheckCircle, Clock, AlertTriangle, XCircle, Loader } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useLocation, Link } from 'react-router-dom';
+import { getIncident, getNearestAuthorities, getIncidentReports } from '../services/api';
+import IncidentMap, { STATUS_LABELS, CATEGORY_COLORS } from '../components/IncidentMap';
+import { Search, CheckCircle, Clock, AlertTriangle, XCircle, Loader, Phone, Shield } from 'lucide-react';
 import { UPLOAD_BASE } from '../services/api';
 
 const STATUS_ICONS = {
@@ -19,23 +19,42 @@ export default function TrackIncident() {
   const location = useLocation();
   const [incidentId, setIncidentId] = useState(location.state?.incidentId || '');
   const [incident, setIncident] = useState(null);
+  const [nearby, setNearby] = useState([]);
+  const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleSearch = async (e) => {
-    e.preventDefault();
-    if (!incidentId) return;
+  const fetchIncident = async (id) => {
     setLoading(true);
     setError('');
     setIncident(null);
-
+    setNearby([]);
+    setReports([]);
     try {
-      const res = await getIncident(incidentId);
+      const res = await getIncident(id);
       setIncident(res.data);
+      try {
+        const [authRes, reportRes] = await Promise.all([
+          getNearestAuthorities(id, 6),
+          getIncidentReports(id),
+        ]);
+        setNearby(authRes.data.offices || []);
+        setReports(reportRes.data || []);
+      } catch { /* optional */ }
     } catch {
       setError('Incident not found. Please check the reference number.');
     }
     setLoading(false);
+  };
+
+  useEffect(() => {
+    if (location.state?.incidentId) fetchIncident(location.state.incidentId);
+  }, [location.state]);
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    if (!incidentId) return;
+    fetchIncident(incidentId);
   };
 
   const currentStep = incident ? STATUS_STEPS.indexOf(incident.status) : -1;
@@ -103,7 +122,7 @@ export default function TrackIncident() {
           {incident.status === 'fake' && (
             <div className="alert alert-error">
               <AlertTriangle size={20} />
-              This report has been flagged as fake/false by authorities.
+              This report has been flagged as a false alarm by the responder.
             </div>
           )}
 
@@ -146,6 +165,59 @@ export default function TrackIncident() {
                 <p>{incident.ai_suggested_category.replace('_', ' ')}</p>
               </div>
             )}
+          </div>
+
+          <div className="detail-row">
+            <strong>Incident on map:</strong>
+            <div style={{ marginTop: 8 }}>
+              <IncidentMap
+                incidents={[incident]}
+                offices={nearby}
+                center={[incident.latitude, incident.longitude]}
+                zoom={11}
+                height="320px"
+              />
+            </div>
+          </div>
+
+          {nearby.length > 0 && (
+            <div className="detail-row">
+              <strong><Shield size={14} /> Nearest Authorities</strong>
+              <div className="nearby-list">
+                {nearby.map((o, i) => (
+                  <div key={i} className="nearby-card">
+                    <div>
+                      <span className="nearby-name">{o.name}</span>
+                      <span className="nearby-meta">{o.type.replace('_', ' ')} · {o.city} · {o.distance_km} km</span>
+                    </div>
+                    {o.phone && (
+                      <a href={`tel:${o.phone}`} className="btn btn-sm btn-secondary">
+                        <Phone size={12} /> {o.phone}
+                      </a>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {reports.length > 0 && (
+            <div className="detail-row">
+              <strong>Responder Reports</strong>
+              {reports.map((r) => (
+                <div key={r.id} className="responder-report">
+                  <p><strong>{r.responder_name}</strong> ({r.responder_authority.replace('_', ' ')}) — outcome: <em>{r.outcome.replace('_', ' ')}</em></p>
+                  {r.notes && <p>{r.notes}</p>}
+                  <p className="detail-time">{new Date(r.created_at).toLocaleString()}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div style={{ marginTop: 20 }}>
+            <Link to={`/respond/${incident.id}`} className="btn btn-outline">
+              Did you attend this incident? Submit responder report
+            </Link>
           </div>
         </div>
       )}

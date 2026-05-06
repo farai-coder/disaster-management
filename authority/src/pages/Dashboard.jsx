@@ -29,8 +29,8 @@ export default function Dashboard() {
   const fetchData = async (authorityType) => {
     try {
       const [statsRes, notifsRes, alertsRes] = await Promise.all([
-        getDashboardStats(authorityType === 'admin' ? null : authorityType),
-        getNotifications(authorityType === 'admin' ? null : authorityType),
+        getDashboardStats(authorityType),
+        getNotifications(authorityType),
         getAlerts({ active_only: true }),
       ]);
       setStats(statsRes.data);

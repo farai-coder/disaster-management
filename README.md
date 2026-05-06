@@ -55,10 +55,9 @@ The backend automatically seeds the following authority accounts on first run:
 
 | Username        | Password      | Role              | Department                |
 |-----------------|---------------|-------------------|---------------------------|
-| `admin`         | `password123` | Admin             | System                    |
 | `police_admin`  | `password123` | Police            | Zimbabwe Republic Police  |
-| `fire_admin`    | `password123` | Fire Department   | City Fire Department      |
-| `health_admin`  | `password123` | Health            | Ministry of Health        |
+| `fire_admin`    | `password123` | Fire Brigade      | City Fire Department      |
+| `health_admin`  | `password123` | Health / Ambulance| Ministry of Health        |
 | `civil_admin`   | `password123` | Civil Protection  | Civil Protection          |
 
-Login at `http://localhost:5174` using any of the above credentials.
+New authority accounts can also be created via `Sign up` on the login page at `http://localhost:5174/signup`.
