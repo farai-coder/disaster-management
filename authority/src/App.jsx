@@ -1,0 +1,30 @@
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import AuthorityLayout from './components/AuthorityLayout';
+import AuthorityLogin from './pages/AuthorityLogin';
+import AuthoritySignup from './pages/AuthoritySignup';
+import Dashboard from './pages/Dashboard';
+import ManageIncidents from './pages/ManageIncidents';
+import AlertsManager from './pages/AlertsManager';
+import Reports from './pages/Reports';
+import AccountSettings from './pages/AccountSettings';
+
+function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/login" element={<AuthorityLogin />} />
+        <Route path="/signup" element={<AuthoritySignup />} />
+        <Route element={<AuthorityLayout />}>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/incidents" element={<ManageIncidents />} />
+          <Route path="/alerts" element={<AlertsManager />} />
+          <Route path="/reports" element={<Reports />} />
+          <Route path="/settings" element={<AccountSettings />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
+export default App;
