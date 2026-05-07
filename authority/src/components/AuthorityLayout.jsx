@@ -1,13 +1,14 @@
 import { Outlet, Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import {
   Shield, Menu, X, ChevronLeft, ChevronRight, LogOut,
-  LayoutDashboard, FileText, PlusCircle, Map, Home, BarChart3, Settings,
+  LayoutDashboard, FileText, PlusCircle, Map, Home, BarChart3, Settings, ClipboardCheck,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 const navItems = [
   { path: '/dashboard', label: 'Overview', icon: LayoutDashboard },
   { path: '/incidents', label: 'Manage Incidents', icon: FileText },
+  { path: '/responders', label: 'Responders', icon: ClipboardCheck },
   { path: '/alerts', label: 'Alerts & Issue New', icon: PlusCircle },
   { path: '/reports', label: 'Reports', icon: BarChart3 },
   { path: '/settings', label: 'Account Settings', icon: Settings },

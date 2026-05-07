@@ -137,14 +137,14 @@ export default function Dashboard() {
 
             <div className="dashboard-section">
               <h2>
-                <Bell size={18} /> Notifications ({notifications.length})
+                <Bell size={18} className={notifications.length > 0 ? 'bell-flicker' : ''} /> Notifications ({notifications.length})
               </h2>
               <div className="notifications-list">
                 {notifications.length === 0 ? (
                   <p className="empty-text">No unread notifications</p>
                 ) : (
                   notifications.slice(0, 10).map((notif) => (
-                    <div key={notif.id} className="notification-item">
+                    <div key={notif.id} className="notification-item notification-flicker">
                       <p>{notif.message}</p>
                       <div className="notification-meta">
                         <span>{new Date(notif.created_at).toLocaleString()}</span>

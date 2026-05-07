@@ -8,8 +8,14 @@ from typing import Optional
 from database import get_db
 from models import Incident, IncidentReport, IncidentCategory, IncidentStatus, AuthorityType
 from schemas import IncidentCreate, IncidentUpdate, IncidentResponse, IncidentReportCreate, IncidentReportResponse
-from services.image_classifier import classify_image
-from services.notification import create_incident_notification, get_responsible_authority, get_responsible_authorities, CATEGORY_AUTHORITY_MAP
+from services.notification import (
+    create_incident_notification,
+    get_responsible_authority,
+    get_responsible_authorities,
+    detect_authorities,
+    incident_targets_authority,
+    CATEGORY_AUTHORITY_MAP,
+)
 from services.authority_offices import nearest_offices
 
 router = APIRouter(prefix="/api/incidents", tags=["Incidents"])
@@ -21,8 +27,8 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 @router.post("/", response_model=IncidentResponse)
 async def create_incident(
     title: str = Form(...),
-    description: str = Form(...),
-    category: IncidentCategory = Form(...),
+    description: str = Form(""),
+    category: IncidentCategory = Form(IncidentCategory.OTHER),
     latitude: float = Form(...),
     longitude: float = Form(...),
     location_name: Optional[str] = Form(None),
@@ -33,7 +39,6 @@ async def create_incident(
     db: Session = Depends(get_db),
 ):
     photo_url = None
-    ai_suggested = None
 
     if photo and photo.filename:
         ext = os.path.splitext(photo.filename)[1]
@@ -42,9 +47,6 @@ async def create_incident(
         with open(filepath, "wb") as f:
             shutil.copyfileobj(photo.file, f)
         photo_url = f"/uploads/{filename}"
-
-        result = classify_image(photo.filename, description)
-        ai_suggested = result["suggested_category"]
 
     authority = get_responsible_authority(category)
 
@@ -56,7 +58,6 @@ async def create_incident(
         longitude=longitude,
         location_name=location_name,
         photo_url=photo_url,
-        ai_suggested_category=ai_suggested,
         is_anonymous=is_anonymous,
         reporter_name=None if is_anonymous else reporter_name,
         reporter_contact=None if is_anonymous else reporter_contact,
@@ -85,20 +86,19 @@ def list_incidents(
         query = query.filter(Incident.category == category)
     if status:
         query = query.filter(Incident.status == status)
-    if authority:
-        # Show incidents where this authority is responsible (including shared categories like accidents)
-        try:
-            auth_type = AuthorityType(authority)
-            relevant_categories = [
-                cat for cat, auths in CATEGORY_AUTHORITY_MAP.items()
-                if auth_type in auths
-            ]
-            query = query.filter(
-                (Incident.assigned_authority == authority) | (Incident.category.in_(relevant_categories))
-            )
-        except ValueError:
-            query = query.filter(Incident.assigned_authority == authority)
-    return query.offset(offset).limit(limit).all()
+    if not authority:
+        return query.offset(offset).limit(limit).all()
+
+    # Authority filter: include incidents where this authority is responsible
+    # by category OR by keywords detected in title/description.
+    try:
+        auth_type = AuthorityType(authority)
+    except ValueError:
+        return query.filter(Incident.assigned_authority == authority).offset(offset).limit(limit).all()
+
+    rows = query.all()
+    matched = [inc for inc in rows if incident_targets_authority(inc, auth_type)]
+    return matched[offset:offset + limit]
 
 
 @router.get("/{incident_id}", response_model=IncidentResponse)
@@ -142,15 +142,6 @@ def delete_incident(incident_id: int, db: Session = Depends(get_db)):
     return {"detail": "Incident deleted"}
 
 
-@router.post("/classify-image")
-async def classify_uploaded_image(
-    photo: UploadFile = File(...),
-    description: str = Form(""),
-):
-    result = classify_image(photo.filename, description)
-    return result
-
-
 @router.get("/{incident_id}/nearest-authorities")
 def get_nearest_authorities(
     incident_id: int,
@@ -160,12 +151,51 @@ def get_nearest_authorities(
     incident = db.query(Incident).filter(Incident.id == incident_id).first()
     if not incident:
         raise HTTPException(status_code=404, detail="Incident not found")
-    types = get_responsible_authorities(incident.category)
+    types = detect_authorities(incident.title, incident.description, incident.category)
     return {
         "incident_id": incident.id,
         "responsible_types": [t.value for t in types],
         "offices": nearest_offices(incident.latitude, incident.longitude, types, limit=limit),
     }
+
+
+@router.get("/reports/all")
+def list_all_responder_reports(
+    authority: Optional[str] = Query(None),
+    limit: int = Query(100, le=500),
+    db: Session = Depends(get_db),
+):
+    """All responder reports, optionally filtered by authority type. Joins each report with its incident."""
+    q = db.query(IncidentReport).order_by(IncidentReport.created_at.desc())
+    if authority:
+        try:
+            auth_type = AuthorityType(authority)
+            q = q.filter(IncidentReport.responder_authority == auth_type)
+        except ValueError:
+            pass
+    reports = q.limit(limit).all()
+    incident_ids = {r.incident_id for r in reports}
+    incidents = {
+        i.id: i for i in db.query(Incident).filter(Incident.id.in_(incident_ids)).all()
+    }
+    out = []
+    for r in reports:
+        inc = incidents.get(r.incident_id)
+        out.append({
+            "id": r.id,
+            "incident_id": r.incident_id,
+            "responder_name": r.responder_name,
+            "responder_authority": r.responder_authority.value,
+            "outcome": r.outcome,
+            "notes": r.notes,
+            "is_false_alarm": r.is_false_alarm,
+            "created_at": r.created_at.isoformat(),
+            "incident_title": inc.title if inc else None,
+            "incident_category": inc.category.value if inc else None,
+            "incident_status": inc.status.value if inc else None,
+            "incident_location_name": inc.location_name if inc else None,
+        })
+    return out
 
 
 @router.get("/{incident_id}/reports", response_model=list[IncidentReportResponse])

@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const API_BASE = 'http://localhost:8000/api';
+const API_HOST = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
+const API_BASE = `http://${API_HOST}:8000/api`;
 
 const api = axios.create({
   baseURL: API_BASE,
@@ -83,4 +84,7 @@ export const submitResponderReport = (incidentId, payload) =>
 export const getIncidentReports = (incidentId) =>
   api.get(`/incidents/${incidentId}/reports`);
 
-export const UPLOAD_BASE = 'http://localhost:8000';
+export const getAllResponderReports = (params = {}) =>
+  api.get('/incidents/reports/all', { params });
+
+export const UPLOAD_BASE = `http://${API_HOST}:8000`;

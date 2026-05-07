@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const API_BASE = 'http://localhost:8000/api';
+const API_HOST = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
+const API_BASE = `http://${API_HOST}:8000/api`;
 
 const api = axios.create({
   baseURL: API_BASE,
@@ -77,4 +78,4 @@ export const getNotifications = (authorityType, unreadOnly = true) =>
 export const markNotificationRead = (id) =>
   api.patch(`/authorities/notifications/${id}/read`);
 
-export const UPLOAD_BASE = 'http://localhost:8000';
+export const UPLOAD_BASE = `http://${API_HOST}:8000`;

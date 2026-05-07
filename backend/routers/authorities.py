@@ -62,40 +62,32 @@ def get_dashboard_stats(
     authority_type: str | None = None,
     db: Session = Depends(get_db),
 ):
-    base_query = db.query(Incident)
+    from services.notification import incident_targets_authority
+
+    all_incidents = db.query(Incident).order_by(Incident.created_at.desc()).all()
     if authority_type:
-        from services.notification import CATEGORY_AUTHORITY_MAP
         try:
             atype = AuthorityType(authority_type)
-            relevant = [c for c, auths in CATEGORY_AUTHORITY_MAP.items() if atype in auths]
-            base_query = base_query.filter(
-                (Incident.assigned_authority == authority_type) | (Incident.category.in_(relevant))
-            )
+            scoped = [i for i in all_incidents if incident_targets_authority(i, atype)]
         except ValueError:
-            base_query = base_query.filter(Incident.assigned_authority == authority_type)
+            scoped = [i for i in all_incidents if (i.assigned_authority and i.assigned_authority.value == authority_type)]
+    else:
+        scoped = all_incidents
 
-    total = base_query.count()
-    pending = base_query.filter(Incident.status == IncidentStatus.PENDING).count()
-    verified = base_query.filter(Incident.status == IncidentStatus.VERIFIED).count()
-    in_progress = base_query.filter(Incident.status == IncidentStatus.IN_PROGRESS).count()
-    resolved = base_query.filter(Incident.status == IncidentStatus.RESOLVED).count()
-    fake = base_query.filter(Incident.status == IncidentStatus.FAKE).count()
+    total = len(scoped)
+    pending = sum(1 for i in scoped if i.status == IncidentStatus.PENDING)
+    verified = sum(1 for i in scoped if i.status == IncidentStatus.VERIFIED)
+    in_progress = sum(1 for i in scoped if i.status == IncidentStatus.IN_PROGRESS)
+    resolved = sum(1 for i in scoped if i.status == IncidentStatus.RESOLVED)
+    fake = sum(1 for i in scoped if i.status == IncidentStatus.FAKE)
     active_alerts = db.query(Alert).filter(Alert.is_active == True).count()
 
-    category_counts = (
-        base_query
-        .with_entities(Incident.category, func.count(Incident.id))
-        .group_by(Incident.category)
-        .all()
-    )
-    incidents_by_category = {cat.value: count for cat, count in category_counts}
+    incidents_by_category = {}
+    for i in scoped:
+        key = i.category.value
+        incidents_by_category[key] = incidents_by_category.get(key, 0) + 1
 
-    recent = (
-        base_query
-        .order_by(Incident.created_at.desc())
-        .limit(10)
-        .all()
-    )
+    recent = scoped[:10]
 
     return DashboardStats(
         total_incidents=total,
@@ -215,21 +207,20 @@ def reports_summary(
     db: Session = Depends(get_db),
 ):
     """Aggregate report data for printable analytics."""
+    from services.notification import incident_targets_authority
+
     q = db.query(Incident)
-    if authority_type:
-        try:
-            atype = AuthorityType(authority_type)
-            from services.notification import CATEGORY_AUTHORITY_MAP
-            relevant = [c for c, auths in CATEGORY_AUTHORITY_MAP.items() if atype in auths]
-            q = q.filter((Incident.assigned_authority == authority_type) | (Incident.category.in_(relevant)))
-        except ValueError:
-            pass
     if start:
         q = q.filter(Incident.created_at >= start)
     if end:
         q = q.filter(Incident.created_at <= end)
-
     incidents = q.order_by(Incident.created_at.desc()).all()
+    if authority_type:
+        try:
+            atype = AuthorityType(authority_type)
+            incidents = [i for i in incidents if incident_targets_authority(i, atype)]
+        except ValueError:
+            pass
 
     by_category = {}
     by_status = {}

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { getIncident, getNearestAuthorities, getIncidentReports } from '../services/api';
 import IncidentMap, { STATUS_LABELS, CATEGORY_COLORS } from '../components/IncidentMap';
-import { Search, CheckCircle, Clock, AlertTriangle, XCircle, Loader, Phone, Shield } from 'lucide-react';
+import { Search, CheckCircle, Clock, AlertTriangle, XCircle, Loader, Phone, Shield, Navigation } from 'lucide-react';
 import { UPLOAD_BASE } from '../services/api';
 
 const STATUS_ICONS = {
@@ -23,6 +23,37 @@ export default function TrackIncident() {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [routeFrom, setRouteFrom] = useState(null);
+  const [routeSummary, setRouteSummary] = useState(null);
+  const [routeError, setRouteError] = useState('');
+  const [locating, setLocating] = useState(false);
+
+  const showDirections = () => {
+    setRouteError('');
+    if (!navigator.geolocation) {
+      setRouteError('Geolocation is not supported by your browser.');
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setRouteFrom([pos.coords.latitude, pos.coords.longitude]);
+        setLocating(false);
+      },
+      (err) => {
+        setLocating(false);
+        if (err.code === 1) setRouteError('Location permission denied.');
+        else setRouteError('Could not determine your location.');
+      },
+      { timeout: 15000, enableHighAccuracy: true }
+    );
+  };
+
+  const clearDirections = () => {
+    setRouteFrom(null);
+    setRouteSummary(null);
+    setRouteError('');
+  };
 
   const fetchIncident = async (id) => {
     setLoading(true);
@@ -159,16 +190,27 @@ export default function TrackIncident() {
                 <img src={`${UPLOAD_BASE}${incident.photo_url}`} alt="Incident" className="track-photo" />
               </div>
             )}
-            {incident.ai_suggested_category && (
-              <div className="detail-row">
-                <strong>AI Suggested Category:</strong>
-                <p>{incident.ai_suggested_category.replace('_', ' ')}</p>
-              </div>
-            )}
           </div>
 
           <div className="detail-row">
             <strong>Incident on map:</strong>
+            <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+              {!routeFrom ? (
+                <button type="button" className="btn btn-secondary" onClick={showDirections} disabled={locating}>
+                  <Navigation size={14} /> {locating ? 'Locating...' : 'Get directions from my location'}
+                </button>
+              ) : (
+                <button type="button" className="btn btn-outline" onClick={clearDirections}>
+                  Hide directions
+                </button>
+              )}
+              {routeSummary && (
+                <span style={{ fontSize: '0.9rem', color: 'var(--gray-600, #4b5563)' }}>
+                  {routeSummary.distance_km.toFixed(1)} km · about {Math.round(routeSummary.duration_min)} min by road
+                </span>
+              )}
+              {routeError && <span style={{ fontSize: '0.85rem', color: '#dc2626' }}>{routeError}</span>}
+            </div>
             <div style={{ marginTop: 8 }}>
               <IncidentMap
                 incidents={[incident]}
@@ -176,6 +218,9 @@ export default function TrackIncident() {
                 center={[incident.latitude, incident.longitude]}
                 zoom={11}
                 height="320px"
+                routeFrom={routeFrom}
+                routeTo={routeFrom ? [incident.latitude, incident.longitude] : null}
+                onRouteSummary={setRouteSummary}
               />
             </div>
           </div>

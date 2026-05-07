@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { changePassword, resetDemoData } from '../services/api';
-import { Lock, Loader, Trash2, AlertTriangle } from 'lucide-react';
+import { changePassword } from '../services/api';
+import { Lock, Loader } from 'lucide-react';
 
 export default function AccountSettings() {
   const authority = JSON.parse(localStorage.getItem('authority') || '{}');
@@ -8,7 +8,6 @@ export default function AccountSettings() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [resetState, setResetState] = useState({ loading: false, message: '' });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -36,21 +35,10 @@ export default function AccountSettings() {
     setLoading(false);
   };
 
-  const handleDemoReset = async () => {
-    if (!confirm('Permanently delete ALL incidents, alerts, notifications, and responder reports? This cannot be undone.')) return;
-    setResetState({ loading: true, message: '' });
-    try {
-      const res = await resetDemoData();
-      setResetState({ loading: false, message: `Wiped: ${JSON.stringify(res.data.deleted)}` });
-    } catch (err) {
-      setResetState({ loading: false, message: err.response?.data?.detail || 'Reset failed' });
-    }
-  };
-
   return (
     <div className="page">
       <h1>Account Settings</h1>
-      <p className="page-subtitle">Manage your authority account and demo data.</p>
+      <p className="page-subtitle">Manage your authority account.</p>
 
       <div className="dashboard-section" style={{ maxWidth: 640 }}>
         <h2><Lock size={18} /> Change Password</h2>
@@ -93,21 +81,6 @@ export default function AccountSettings() {
             {loading ? 'Saving...' : 'Update Password'}
           </button>
         </form>
-      </div>
-
-      <div className="dashboard-section danger-zone" style={{ maxWidth: 640, marginTop: 20 }}>
-        <h2><AlertTriangle size={18} /> Danger Zone</h2>
-        <p style={{ color: 'var(--gray-500)', fontSize: '0.9rem', marginBottom: 12 }}>
-          Quickly clear demo data — useful when preparing the system for a fresh demo or live deployment.
-          This wipes <strong>all</strong> incidents, alerts, notifications, and responder reports.
-        </p>
-        <button className="btn btn-danger" onClick={handleDemoReset} disabled={resetState.loading}>
-          {resetState.loading ? <Loader size={16} className="spin" /> : <Trash2 size={16} />}
-          {resetState.loading ? 'Wiping...' : 'Wipe Demo Data'}
-        </button>
-        {resetState.message && (
-          <p style={{ marginTop: 10, fontSize: '0.88rem', color: 'var(--gray-600)' }}>{resetState.message}</p>
-        )}
       </div>
     </div>
   );

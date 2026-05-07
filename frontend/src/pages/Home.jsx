@@ -1,28 +1,7 @@
-import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { FileText, Map, Phone, AlertTriangle } from 'lucide-react';
-import { getEmergencyNumbers } from '../services/api';
-
-const FALLBACK_NUMBERS = [
-  { label: 'Police', number: '995', alt: '+263 242 700 171' },
-  { label: 'Ambulance / Health', number: '994', alt: '+263 242 705 906' },
-  { label: 'Fire Brigade', number: '993', alt: '+263 242 752 167' },
-  { label: 'Civil Protection', number: '0242-700-117', alt: '' },
-  { label: 'Childline Zimbabwe', number: '116', alt: '' },
-  { label: 'Musasa (GBV)', number: '08080074', alt: '' },
-  { label: 'ZESA Emergency', number: '08006328', alt: '' },
-  { label: 'ZINWA Emergency', number: '08004545', alt: '' },
-];
+import { FileText, Map, AlertTriangle } from 'lucide-react';
 
 export default function Home() {
-  const [numbers, setNumbers] = useState(FALLBACK_NUMBERS);
-
-  useEffect(() => {
-    getEmergencyNumbers()
-      .then((res) => setNumbers(res.data.numbers || FALLBACK_NUMBERS))
-      .catch(() => {});
-  }, []);
-
   return (
     <div className="home-page">
       <section className="hero">
@@ -43,29 +22,6 @@ export default function Home() {
               View Live Map
             </Link>
           </div>
-        </div>
-      </section>
-
-      <section className="emergency-numbers">
-        <div className="emergency-header">
-          <Phone size={22} />
-          <div>
-            <h2>Emergency Toll-Free Numbers</h2>
-            <p>Call any of the lines below for immediate assistance anywhere in Zimbabwe.</p>
-          </div>
-        </div>
-        <div className="emergency-grid">
-          {numbers.map((n) => (
-            <a
-              key={n.label}
-              href={`tel:${n.number.replace(/\s|-/g, '')}`}
-              className="emergency-card"
-            >
-              <span className="emergency-label">{n.label}</span>
-              <span className="emergency-number">{n.number}</span>
-              {n.alt && <span className="emergency-alt">{n.alt}</span>}
-            </a>
-          ))}
         </div>
       </section>
 

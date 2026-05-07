@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { useEffect, useState } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -94,12 +94,45 @@ function RecenterMap({ center }) {
   return null;
 }
 
+function RouteLine({ from, to, onSummary }) {
+  const [coords, setCoords] = useState(null);
+  useEffect(() => {
+    if (!from || !to) { setCoords(null); return; }
+    let cancelled = false;
+    const url = `https://router.project-osrm.org/route/v1/driving/${from[1]},${from[0]};${to[1]},${to[0]}?overview=full&geometries=geojson`;
+    fetch(url)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (cancelled || !data) return;
+        const route = data.routes?.[0];
+        if (!route) return;
+        const latlngs = route.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
+        setCoords(latlngs);
+        onSummary?.({ distance_km: route.distance / 1000, duration_min: route.duration / 60 });
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [from?.[0], from?.[1], to?.[0], to?.[1]]);
+  if (!coords) return null;
+  return <Polyline positions={coords} pathOptions={{ color: '#2563eb', weight: 5, opacity: 0.85 }} />;
+}
+
+const startIcon = L.divIcon({
+  className: 'route-start-marker',
+  html: `<div style="background:#10b981;width:18px;height:18px;border-radius:50%;border:3px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.4);"></div>`,
+  iconSize: [18, 18],
+  iconAnchor: [9, 9],
+});
+
 export default function IncidentMap({
   incidents = [],
   offices = [],
   center,
   zoom,
   onIncidentClick,
+  routeFrom,
+  routeTo,
+  onRouteSummary,
   height = '500px',
 }) {
   const validIncidents = incidents.filter(
@@ -123,6 +156,14 @@ export default function IncidentMap({
         noWrap
       />
       {center && <RecenterMap center={center} />}
+      {routeFrom && routeTo && (
+        <>
+          <Marker position={routeFrom} icon={startIcon}>
+            <Popup>Start</Popup>
+          </Marker>
+          <RouteLine from={routeFrom} to={routeTo} onSummary={onRouteSummary} />
+        </>
+      )}
       {validIncidents.map((incident) => (
         <Marker
           key={`inc-${incident.id}`}

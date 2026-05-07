@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapPin, Upload, Send, Eye, EyeOff, Loader, Camera, Image as ImageIcon } from 'lucide-react';
-import { createIncident, classifyImage } from '../services/api';
+import { MapPin, Send, Eye, EyeOff, Loader, Camera, Image as ImageIcon, X } from 'lucide-react';
+import { createIncident } from '../services/api';
 import IncidentMap from '../components/IncidentMap';
 
 const CATEGORIES = [
@@ -13,12 +13,6 @@ const CATEGORIES = [
   { value: 'drought', label: 'Drought' },
   { value: 'other', label: 'Other' },
 ];
-
-// Rough Zimbabwe bounding box for client-side coordinate validation
-const ZW_BBOX = { minLat: -22.5, maxLat: -15.5, minLon: 25.0, maxLon: 33.2 };
-
-const isInsideZimbabwe = (lat, lon) =>
-  lat >= ZW_BBOX.minLat && lat <= ZW_BBOX.maxLat && lon >= ZW_BBOX.minLon && lon <= ZW_BBOX.maxLon;
 
 export default function ReportIncident() {
   const navigate = useNavigate();
@@ -35,7 +29,6 @@ export default function ReportIncident() {
   });
   const [photo, setPhoto] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
-  const [aiSuggestion, setAiSuggestion] = useState(null);
   const [loading, setLoading] = useState(false);
   const [geoLoading, setGeoLoading] = useState(false);
   const [error, setError] = useState('');
@@ -43,10 +36,14 @@ export default function ReportIncident() {
   const [suggestions, setSuggestions] = useState([]);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraError, setCameraError] = useState('');
   const searchTimeoutRef = useRef(null);
   const suggestionsRef = useRef(null);
   const cameraRef = useRef(null);
   const galleryRef = useRef(null);
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
 
   const detectLocation = () => {
     if (!navigator.geolocation) {
@@ -122,21 +119,69 @@ export default function ReportIncident() {
     setSuggestions([]);
   };
 
-  const handlePhotoChange = async (file) => {
+  const handlePhotoChange = (file) => {
     if (!file) return;
     setPhoto(file);
     setPhotoPreview(URL.createObjectURL(file));
+  };
 
+  const openLiveCamera = async () => {
+    setCameraError('');
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraError('Live camera not supported by this browser.');
+      setCameraOpen(true);
+      return;
+    }
+    if (!window.isSecureContext && window.location.hostname !== 'localhost') {
+      setCameraError('Live camera requires HTTPS. On a LAN address, use the "Take Photo" button instead — it opens your phone\'s camera directly.');
+      setCameraOpen(true);
+      return;
+    }
     try {
-      const fd = new FormData();
-      fd.append('photo', file);
-      fd.append('description', form.description || form.title);
-      const res = await classifyImage(fd);
-      setAiSuggestion(res.data);
-    } catch {
-      // AI classification is optional
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' } },
+        audio: false,
+      });
+      streamRef.current = stream;
+      setCameraOpen(true);
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play().catch(() => {});
+        }
+      }, 50);
+    } catch (err) {
+      setCameraError(err?.message || 'Unable to access camera.');
+      setCameraOpen(true);
     }
   };
+
+  const closeLiveCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+    setCameraOpen(false);
+    setCameraError('');
+  };
+
+  const captureFromLiveCamera = () => {
+    const video = videoRef.current;
+    if (!video || !video.videoWidth) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0);
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const file = new File([blob], `capture-${Date.now()}.jpg`, { type: 'image/jpeg' });
+      handlePhotoChange(file);
+      closeLiveCamera();
+    }, 'image/jpeg', 0.9);
+  };
+
+  useEffect(() => () => closeLiveCamera(), []);
 
   const handleMapClick = ({ lat, lng }) => {
     setForm((prev) => ({ ...prev, latitude: lat, longitude: lng }));
@@ -144,25 +189,7 @@ export default function ReportIncident() {
 
   const validate = () => {
     const errs = {};
-    if (!form.title.trim() || form.title.trim().length < 3) errs.title = 'Title must be at least 3 characters';
-    if (!form.description.trim() || form.description.trim().length < 10) errs.description = 'Description must be at least 10 characters';
-    if (!form.category) errs.category = 'Please choose a category';
-    if (form.latitude == null || form.longitude == null || isNaN(form.latitude) || isNaN(form.longitude)) {
-      errs.location = 'Pick a location on the map or use your current location';
-    } else if (!isInsideZimbabwe(form.latitude, form.longitude)) {
-      errs.location = 'Location must be within Zimbabwe';
-    }
-    if (!form.is_anonymous) {
-      if (!form.reporter_name.trim()) errs.reporter_name = 'Name is required for non-anonymous reports';
-      if (!form.reporter_contact.trim()) {
-        errs.reporter_contact = 'Phone or email is required';
-      } else {
-        const v = form.reporter_contact.trim();
-        const isPhone = /^[+\d][\d\s-]{6,}$/.test(v);
-        const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
-        if (!isPhone && !isEmail) errs.reporter_contact = 'Enter a valid phone number or email address';
-      }
-    }
+    if (!form.title.trim()) errs.title = 'Title is required';
     setFieldErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -180,7 +207,7 @@ export default function ReportIncident() {
       const fd = new FormData();
       fd.append('title', form.title.trim());
       fd.append('description', form.description.trim());
-      fd.append('category', form.category);
+      fd.append('category', form.category || 'other');
       fd.append('latitude', form.latitude);
       fd.append('longitude', form.longitude);
       fd.append('location_name', form.location_name);
@@ -189,13 +216,11 @@ export default function ReportIncident() {
         fd.append('reporter_name', form.reporter_name);
         fd.append('reporter_contact', form.reporter_contact);
       }
-      if (photo) {
-        fd.append('photo', photo);
-      }
+      if (photo) fd.append('photo', photo);
 
       const res = await createIncident(fd);
-      setSuccess(`Incident reported successfully! Reference ID: #${res.data.id}`);
-      setTimeout(() => navigate('/track', { state: { incidentId: res.data.id } }), 1800);
+      setSuccess(`Report submitted. Reference #${res.data.id}.`);
+      setTimeout(() => navigate('/track', { state: { incidentId: res.data.id } }), 1200);
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to submit report');
     } finally {
@@ -207,7 +232,7 @@ export default function ReportIncident() {
     <div className="page report-page">
       <h1>Report an Incident</h1>
       <p className="page-subtitle">
-        Submit a geo-tagged report. Fields marked <span style={{ color: 'var(--danger)' }}>*</span> are mandatory. You can remain anonymous.
+        Submit a report. Only the title is required &mdash; everything else is optional.
       </p>
 
       {error && <div className="alert alert-error">{error}</div>}
@@ -232,47 +257,28 @@ export default function ReportIncident() {
             </div>
 
             <div className="form-group">
-              <label>Description <span className="req">*</span></label>
+              <label>Description</label>
               <textarea
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
-                placeholder="Describe what happened in detail..."
+                placeholder="Describe what happened (e.g. 'head-on collision and the cars caught fire'). The system uses keywords to alert the right authorities."
                 rows={4}
-                aria-invalid={!!fieldErrors.description}
-                required
               />
-              {fieldErrors.description && <p className="field-error">{fieldErrors.description}</p>}
             </div>
 
             <div className="form-group">
-              <label>Category <span className="req">*</span></label>
+              <label>Category</label>
               <select
                 value={form.category}
                 onChange={(e) => setForm({ ...form, category: e.target.value })}
-                aria-invalid={!!fieldErrors.category}
-                required
               >
-                <option value="">Select category...</option>
+                <option value="">Select category (optional)...</option>
                 {CATEGORIES.map((cat) => (
                   <option key={cat.value} value={cat.value}>
                     {cat.label}
                   </option>
                 ))}
               </select>
-              {fieldErrors.category && <p className="field-error">{fieldErrors.category}</p>}
-              {aiSuggestion && (
-                <div className="ai-suggestion">
-                  AI suggests: <strong>{aiSuggestion.suggested_category.replace('_', ' ')}</strong>
-                  {' '}({Math.round(aiSuggestion.confidence * 100)}% confidence)
-                  <button
-                    type="button"
-                    className="btn btn-sm"
-                    onClick={() => setForm({ ...form, category: aiSuggestion.suggested_category })}
-                  >
-                    Use suggestion
-                  </button>
-                </div>
-              )}
             </div>
 
             <div className="form-group">
@@ -293,14 +299,17 @@ export default function ReportIncident() {
                 style={{ display: 'none' }}
               />
               <div className="photo-source-buttons">
+                <button type="button" className="btn btn-secondary" onClick={openLiveCamera}>
+                  <Camera size={16} /> Live Camera
+                </button>
                 <button type="button" className="btn btn-secondary" onClick={() => cameraRef.current?.click()}>
                   <Camera size={16} /> Take Photo
                 </button>
                 <button type="button" className="btn btn-secondary" onClick={() => galleryRef.current?.click()}>
-                  <ImageIcon size={16} /> Choose from Gallery / Files
+                  <ImageIcon size={16} /> Gallery / Files
                 </button>
                 {photo && (
-                  <button type="button" className="btn btn-outline" onClick={() => { setPhoto(null); setPhotoPreview(null); setAiSuggestion(null); }}>
+                  <button type="button" className="btn btn-outline" onClick={() => { setPhoto(null); setPhotoPreview(null); }}>
                     Remove
                   </button>
                 )}
@@ -313,7 +322,7 @@ export default function ReportIncident() {
           </div>
 
           <div className="form-section">
-            <h3>Location <span className="req">*</span></h3>
+            <h3>Location</h3>
 
             <div className="form-group" style={{ position: 'relative' }} ref={suggestionsRef}>
               <label>Location Name</label>
@@ -364,8 +373,6 @@ export default function ReportIncident() {
               </div>
             </div>
 
-            {fieldErrors.location && <p className="field-error">{fieldErrors.location}</p>}
-
             <p className="map-hint">Tap on the map below to fine-tune the location.</p>
             <div className="map-picker" style={{ marginTop: 6 }}>
               <IncidentMap
@@ -394,26 +401,22 @@ export default function ReportIncident() {
             {!form.is_anonymous && (
               <>
                 <div className="form-group">
-                  <label>Your Name <span className="req">*</span></label>
+                  <label>Your Name</label>
                   <input
                     type="text"
                     value={form.reporter_name}
                     onChange={(e) => setForm({ ...form, reporter_name: e.target.value })}
-                    placeholder="Full name"
-                    aria-invalid={!!fieldErrors.reporter_name}
+                    placeholder="Full name (optional)"
                   />
-                  {fieldErrors.reporter_name && <p className="field-error">{fieldErrors.reporter_name}</p>}
                 </div>
                 <div className="form-group">
-                  <label>Contact (Phone or Email) <span className="req">*</span></label>
+                  <label>Contact (Phone or Email)</label>
                   <input
                     type="text"
                     value={form.reporter_contact}
                     onChange={(e) => setForm({ ...form, reporter_contact: e.target.value })}
-                    placeholder="e.g. +263 77 123 4567 or you@example.com"
-                    aria-invalid={!!fieldErrors.reporter_contact}
+                    placeholder="Optional contact info"
                   />
-                  {fieldErrors.reporter_contact && <p className="field-error">{fieldErrors.reporter_contact}</p>}
                 </div>
               </>
             )}
@@ -425,6 +428,28 @@ export default function ReportIncident() {
           {loading ? 'Submitting...' : 'Submit Report'}
         </button>
       </form>
+
+      {cameraOpen && (
+        <div className="camera-modal-overlay" onClick={closeLiveCamera}>
+          <div className="camera-modal" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="camera-close" onClick={closeLiveCamera} aria-label="Close camera">
+              <X size={20} />
+            </button>
+            {cameraError ? (
+              <div className="alert alert-error" style={{ margin: 16 }}>{cameraError}</div>
+            ) : (
+              <>
+                <video ref={videoRef} className="camera-video" playsInline muted />
+                <div className="camera-actions">
+                  <button type="button" className="btn btn-primary btn-lg" onClick={captureFromLiveCamera}>
+                    <Camera size={18} /> Capture
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { CATEGORY_COLORS, STATUS_LABELS } from '../components/IncidentMap';
 import IncidentMap from '../components/IncidentMap';
 import {
   Filter, CheckCircle, XCircle, Loader,
-  Trash2, Eye, MapPin, Clock, Phone,
+  Trash2, Eye, MapPin, Clock, Phone, Navigation,
 } from 'lucide-react';
 
 export default function ManageIncidents() {
@@ -16,6 +16,8 @@ export default function ManageIncidents() {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(null);
   const [viewMode, setViewMode] = useState('list');
+  const [routeFromOffice, setRouteFromOffice] = useState(null);
+  const [routeSummary, setRouteSummary] = useState(null);
 
   const authority = JSON.parse(localStorage.getItem('authority') || '{}');
 
@@ -44,6 +46,8 @@ export default function ManageIncidents() {
     setSelected(inc);
     setNearby([]);
     setResponderReports([]);
+    setRouteFromOffice(null);
+    setRouteSummary(null);
     try {
       const [authRes, reportsRes] = await Promise.all([
         getNearestAuthorities(inc.id, 5),
@@ -273,9 +277,6 @@ export default function ManageIncidents() {
           {selected.photo_url && (
             <img src={`${UPLOAD_BASE}${selected.photo_url}`} alt="Incident" className="detail-photo" />
           )}
-          {selected.ai_suggested_category && (
-            <p className="ai-label">AI Suggestion: {selected.ai_suggested_category.replace('_', ' ')}</p>
-          )}
 
           <div style={{ marginTop: 16 }}>
             <h4>Location & Nearest Authorities</h4>
@@ -284,8 +285,22 @@ export default function ManageIncidents() {
               offices={nearby}
               center={[selected.latitude, selected.longitude]}
               zoom={11}
-              height="220px"
+              height="240px"
+              routeFrom={routeFromOffice ? [routeFromOffice.latitude, routeFromOffice.longitude] : null}
+              routeTo={routeFromOffice ? [selected.latitude, selected.longitude] : null}
+              onRouteSummary={setRouteSummary}
             />
+            {routeFromOffice && (
+              <div style={{ marginTop: 8, fontSize: '0.88rem', color: 'var(--gray-600, #4b5563)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>
+                  Route: <strong>{routeFromOffice.name}</strong> &rarr; incident
+                  {routeSummary && ` · ${routeSummary.distance_km.toFixed(1)} km · ~${Math.round(routeSummary.duration_min)} min`}
+                </span>
+                <button className="btn btn-sm btn-outline" onClick={() => { setRouteFromOffice(null); setRouteSummary(null); }}>
+                  Clear route
+                </button>
+              </div>
+            )}
             {nearby.length > 0 && (
               <div className="nearby-list" style={{ marginTop: 10 }}>
                 {nearby.map((o, i) => (
@@ -294,11 +309,20 @@ export default function ManageIncidents() {
                       <span className="nearby-name">{o.name}</span>
                       <span className="nearby-meta">{o.type.replace('_', ' ')} · {o.city} · {o.distance_km} km</span>
                     </div>
-                    {o.phone && (
-                      <a href={`tel:${o.phone}`} className="btn btn-sm btn-secondary">
-                        <Phone size={12} /> {o.phone}
-                      </a>
-                    )}
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button
+                        className="btn btn-sm btn-outline"
+                        onClick={() => { setRouteFromOffice(o); setRouteSummary(null); }}
+                        title="Show driving route from this office to the incident"
+                      >
+                        <Navigation size={12} /> Route
+                      </button>
+                      {o.phone && (
+                        <a href={`tel:${o.phone}`} className="btn btn-sm btn-secondary">
+                          <Phone size={12} /> {o.phone}
+                        </a>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
