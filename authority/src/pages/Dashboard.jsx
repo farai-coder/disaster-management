@@ -24,6 +24,8 @@ export default function Dashboard() {
     const auth = JSON.parse(stored);
     setAuthority(auth);
     fetchData(auth.authority_type);
+    const pollNotifs = setInterval(() => pollNotifications(auth.authority_type), 12000);
+    return () => clearInterval(pollNotifs);
   }, []);
 
   const fetchData = async (authorityType) => {
@@ -42,9 +44,28 @@ export default function Dashboard() {
     setLoading(false);
   };
 
+  const pollNotifications = async (authorityType) => {
+    try {
+      const [statsRes, notifsRes] = await Promise.all([
+        getDashboardStats(authorityType),
+        getNotifications(authorityType),
+      ]);
+      setStats(statsRes.data);
+      setNotifications(notifsRes.data);
+    } catch {
+      // ignore
+    }
+  };
+
   const handleMarkRead = async (id) => {
     await markNotificationRead(id);
     setNotifications((prev) => prev.filter((n) => n.id !== id));
+  };
+
+  const handleMarkAllRead = async () => {
+    const ids = notifications.map((n) => n.id);
+    await Promise.all(ids.map((id) => markNotificationRead(id).catch(() => {})));
+    setNotifications([]);
   };
 
   if (loading) {
@@ -136,9 +157,16 @@ export default function Dashboard() {
             </div>
 
             <div className="dashboard-section">
-              <h2>
-                <Bell size={18} className={notifications.length > 0 ? 'bell-flicker' : ''} /> Notifications ({notifications.length})
-              </h2>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <h2 style={{ margin: 0 }}>
+                  <Bell size={18} className={notifications.length > 0 ? 'bell-flicker' : ''} /> Notifications ({notifications.length})
+                </h2>
+                {notifications.length > 0 && (
+                  <button className="btn btn-sm btn-outline" onClick={handleMarkAllRead}>
+                    Mark all read
+                  </button>
+                )}
+              </div>
               <div className="notifications-list">
                 {notifications.length === 0 ? (
                   <p className="empty-text">No unread notifications</p>

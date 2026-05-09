@@ -1,13 +1,15 @@
 import { Outlet, Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import {
-  Shield, Menu, X, ChevronLeft, ChevronRight, LogOut,
-  LayoutDashboard, FileText, PlusCircle, Map, Home, BarChart3, Settings, ClipboardCheck,
+  Shield, Menu, X, ChevronLeft, ChevronRight, LogOut, Bell,
+  LayoutDashboard, FileText, PlusCircle, Map, Home, BarChart3, Settings, ClipboardCheck, UserCheck,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { getNotifications } from '../services/api';
 
 const navItems = [
   { path: '/dashboard', label: 'Overview', icon: LayoutDashboard },
   { path: '/incidents', label: 'Manage Incidents', icon: FileText },
+  { path: '/attendance', label: 'Attendance', icon: UserCheck },
   { path: '/responders', label: 'Responders', icon: ClipboardCheck },
   { path: '/alerts', label: 'Alerts & Issue New', icon: PlusCircle },
   { path: '/reports', label: 'Reports', icon: BarChart3 },
@@ -20,6 +22,7 @@ export default function AuthorityLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [authority, setAuthority] = useState(null);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     setMobileOpen(false);
@@ -30,6 +33,19 @@ export default function AuthorityLayout() {
       setAuthority(null);
     }
   }, [location.pathname]);
+
+  useEffect(() => {
+    if (!authority?.authority_type) return;
+    const tick = async () => {
+      try {
+        const res = await getNotifications(authority.authority_type, true);
+        setUnreadCount(Array.isArray(res.data) ? res.data.length : 0);
+      } catch { /* ignore */ }
+    };
+    tick();
+    const interval = setInterval(tick, 12000);
+    return () => clearInterval(interval);
+  }, [authority?.authority_type, location.pathname]);
 
   const stored = localStorage.getItem('authority');
   if (!stored) {
@@ -145,6 +161,14 @@ export default function AuthorityLayout() {
           <div className="topbar-title">
             Authority Dashboard &mdash; {authority?.name || 'Loading...'}
           </div>
+          <Link
+            to="/dashboard"
+            className={`topbar-bell ${unreadCount > 0 ? 'has-unread' : ''}`}
+            title={unreadCount > 0 ? `${unreadCount} unread notifications` : 'Notifications'}
+          >
+            <Bell size={20} className={unreadCount > 0 ? 'bell-flicker' : ''} />
+            {unreadCount > 0 && <span className="topbar-bell-badge">{unreadCount}</span>}
+          </Link>
         </header>
 
         <main className="main-content">

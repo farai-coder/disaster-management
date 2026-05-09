@@ -1577,6 +1577,50 @@ img { max-width: 100%; }
   transform-origin: 50% 0%;
 }
 
+/* ===== Attendance expanded row ===== */
+.attendance-detail-row td {
+  background: #f8fafc;
+  padding: 16px 20px;
+}
+.attendance-detail h4 {
+  font-size: 0.95rem;
+  color: var(--gray-800);
+}
+
+/* ===== Topbar notification bell ===== */
+.topbar-bell {
+  position: relative;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  color: var(--gray-700, #334155);
+  text-decoration: none;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.topbar-bell:hover { background: rgba(15, 23, 42, 0.06); }
+.topbar-bell.has-unread { color: #dc2626; }
+.topbar-bell-badge {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  background: #dc2626;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 0 2px white;
+}
+
 /* ===== Leaflet Fix ===== */
 .leaflet-container {
   z-index: 1;

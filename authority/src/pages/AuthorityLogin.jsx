@@ -26,22 +26,6 @@ export default function AuthorityLogin() {
     setLoading(false);
   };
 
-  const quickLogin = async (user) => {
-    setUsername(user);
-    setPassword('password123');
-    setLoading(true);
-    setError('');
-    try {
-      const res = await loginAuthority({ username: user, password: 'password123' });
-      localStorage.setItem('auth_token', res.data.access_token);
-      localStorage.setItem('authority', JSON.stringify(res.data.authority));
-      navigate('/dashboard');
-    } catch {
-      setError('Login failed');
-    }
-    setLoading(false);
-  };
-
   return (
     <div className="login-page-standalone">
       <div className="login-card">
@@ -79,24 +63,6 @@ export default function AuthorityLogin() {
             {loading ? 'Logging in...' : 'Login'}
           </button>
         </form>
-
-        <div className="quick-login">
-          <p>Demo Quick Login:</p>
-          <div className="quick-login-buttons">
-            <button onClick={() => quickLogin('police_admin')} className="btn btn-outline">
-              Police
-            </button>
-            <button onClick={() => quickLogin('fire_admin')} className="btn btn-outline">
-              Fire Brigade
-            </button>
-            <button onClick={() => quickLogin('health_admin')} className="btn btn-outline">
-              Health
-            </button>
-            <button onClick={() => quickLogin('civil_admin')} className="btn btn-outline">
-              Civil Protection
-            </button>
-          </div>
-        </div>
 
         <div className="login-back-link" style={{ display: 'flex', justifyContent: 'space-between', marginTop: 12 }}>
           <Link to="/signup"><UserPlus size={14} /> Create authority account</Link>

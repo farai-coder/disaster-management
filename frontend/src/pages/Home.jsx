@@ -24,26 +24,6 @@ export default function Home() {
           </div>
         </div>
       </section>
-
-      <section className="categories-section">
-        <h2>Incident Categories</h2>
-        <div className="category-grid">
-          {[
-            { name: 'Crime', color: '#ef4444', desc: 'Theft, robbery, assault, vandalism' },
-            { name: 'Fire', color: '#f97316', desc: 'Building fires, veld fires, explosions' },
-            { name: 'Accident', color: '#eab308', desc: 'Road accidents, industrial accidents' },
-            { name: 'Disease Outbreak', color: '#8b5cf6', desc: 'Cholera, typhoid, COVID-19' },
-            { name: 'Cyclone / Flood', color: '#3b82f6', desc: 'Flooding, cyclones, storms' },
-            { name: 'Drought', color: '#a16207', desc: 'Water shortage, crop failure' },
-          ].map((cat) => (
-            <div key={cat.name} className="category-card" style={{ borderColor: cat.color }}>
-              <div className="category-dot" style={{ background: cat.color }} />
-              <h4>{cat.name}</h4>
-              <p>{cat.desc}</p>
-            </div>
-          ))}
-        </div>
-      </section>
     </div>
   );
 }

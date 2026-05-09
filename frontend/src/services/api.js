@@ -43,9 +43,6 @@ export const deactivateAlert = (id) =>
 export const deleteAlert = (id) =>
   api.delete(`/alerts/${id}`);
 
-export const getEmergencyNumbers = () =>
-  api.get('/authorities/emergency-numbers');
-
 export const getNearestAuthorities = (incidentId, limit = 5) =>
   api.get(`/incidents/${incidentId}/nearest-authorities`, { params: { limit } });
 

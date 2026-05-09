@@ -35,7 +35,6 @@ export default function ReportIncident() {
   const [success, setSuccess] = useState('');
   const [suggestions, setSuggestions] = useState([]);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
-  const [fieldErrors, setFieldErrors] = useState({});
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraError, setCameraError] = useState('');
   const searchTimeoutRef = useRef(null);
@@ -187,25 +186,15 @@ export default function ReportIncident() {
     setForm((prev) => ({ ...prev, latitude: lat, longitude: lng }));
   };
 
-  const validate = () => {
-    const errs = {};
-    if (!form.title.trim()) errs.title = 'Title is required';
-    setFieldErrors(errs);
-    return Object.keys(errs).length === 0;
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    if (!validate()) {
-      setError('Please fix the highlighted errors.');
-      return;
-    }
     setLoading(true);
 
     try {
       const fd = new FormData();
-      fd.append('title', form.title.trim());
+      const title = form.title.trim() || 'Incident report';
+      fd.append('title', title);
       fd.append('description', form.description.trim());
       fd.append('category', form.category || 'other');
       fd.append('latitude', form.latitude);
@@ -232,7 +221,7 @@ export default function ReportIncident() {
     <div className="page report-page">
       <h1>Report an Incident</h1>
       <p className="page-subtitle">
-        Submit a report. Only the title is required &mdash; everything else is optional.
+        Submit a report. All fields are optional &mdash; just give what you can.
       </p>
 
       {error && <div className="alert alert-error">{error}</div>}
@@ -244,16 +233,13 @@ export default function ReportIncident() {
             <h3>Incident Details</h3>
 
             <div className="form-group">
-              <label>Title <span className="req">*</span></label>
+              <label>Title</label>
               <input
                 type="text"
                 value={form.title}
                 onChange={(e) => setForm({ ...form, title: e.target.value })}
-                placeholder="Brief title of the incident"
-                aria-invalid={!!fieldErrors.title}
-                required
+                placeholder="Brief title (optional)"
               />
-              {fieldErrors.title && <p className="field-error">{fieldErrors.title}</p>}
             </div>
 
             <div className="form-group">

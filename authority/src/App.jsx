@@ -7,6 +7,7 @@ import ManageIncidents from './pages/ManageIncidents';
 import AlertsManager from './pages/AlertsManager';
 import Reports from './pages/Reports';
 import Responders from './pages/Responders';
+import Attendance from './pages/Attendance';
 import AccountSettings from './pages/AccountSettings';
 
 function App() {
@@ -22,6 +23,7 @@ function App() {
           <Route path="/alerts" element={<AlertsManager />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="/responders" element={<Responders />} />
+          <Route path="/attendance" element={<Attendance />} />
           <Route path="/settings" element={<AccountSettings />} />
         </Route>
       </Routes>

@@ -17,47 +17,80 @@ CATEGORY_AUTHORITY_MAP = {
     IncidentCategory.OTHER: [AuthorityType.CIVIL_PROTECTION, AuthorityType.POLICE],
 }
 
-# Keywords that suggest an incident also requires a particular authority,
+# Keywords and phrases that hint an incident also requires a particular authority,
 # regardless of the chosen category. Used for intelligent multi-routing
 # (e.g., "head-on collision and the cars caught fire" -> add FIRE_DEPARTMENT).
+# Multi-word entries are matched as substrings; single words use word boundaries.
 KEYWORD_AUTHORITY_HINTS = {
     AuthorityType.FIRE_DEPARTMENT: [
-        "fire", "burning", "burnt", "smoke", "explosion", "blaze", "flame", "flames",
+        "fire", "burning", "burnt", "smoke", "smoking",
+        "explosion", "exploded", "explode", "blast", "blaze",
+        "flame", "flames", "ignite", "ignited", "engulfed",
+        "caught fire", "on fire", "set alight", "set ablaze",
+        "burst into flames", "petrol leak", "fuel leak", "gas leak",
     ],
     AuthorityType.HEALTH: [
         "injured", "injury", "hurt", "bleeding", "ambulance", "wounded",
         "casualty", "casualties", "trapped", "unconscious", "overdose",
         "cardiac", "stroke", "outbreak", "cholera", "typhoid", "covid",
+        "fatal", "fatality", "fatalities", "dying", "dead", "deaths",
+        "broken", "fracture", "burnt", "burns", "burn victim",
+        "medical", "first aid", "people hurt", "people injured",
     ],
     AuthorityType.POLICE: [
         "assault", "robbery", "theft", "stolen", "weapon", "gun", "knife",
         "fight", "stabbed", "shot", "kidnap", "hijack", "rape",
+        "head-on", "head on", "collision", "crash", "rollover",
+        "hit and run", "drunk driver", "reckless driving",
     ],
     AuthorityType.CIVIL_PROTECTION: [
         "flood", "flooding", "cyclone", "storm", "drought", "landslide",
         "evacuation", "evacuate", "collapse", "earthquake",
+        "building collapse", "wall collapse", "mass casualty",
     ],
 }
 
 
 def _keyword_matches(text: str, auth_type: AuthorityType) -> bool:
-    keywords = KEYWORD_AUTHORITY_HINTS.get(auth_type, [])
-    for k in keywords:
-        if re.search(rf"\b{re.escape(k)}\b", text):
+    """Match phrases as substrings, single words on word boundaries."""
+    for k in KEYWORD_AUTHORITY_HINTS.get(auth_type, []):
+        if " " in k or "-" in k:
+            if k in text:
+                return True
+        elif re.search(rf"\b{re.escape(k)}\b", text):
             return True
     return False
 
 
+# Categories where any severe wording in the report should automatically
+# bring in additional authorities (police on scene, fire on scene, ambulance).
+SEVERITY_PHRASES = (
+    "fire", "burning", "smoke", "explosion", "exploded", "blast",
+    "caught fire", "on fire", "burst into flames", "engulfed",
+    "trapped", "stuck inside", "people inside", "passengers trapped",
+    "fuel leak", "petrol leak",
+)
+
+
 def detect_authorities(title: str | None, description: str | None, category: IncidentCategory | None) -> list[AuthorityType]:
-    """Return the union of category-based and keyword-detected authorities."""
+    """Return category-based authorities plus any inferred from title/description."""
     selected: list[AuthorityType] = []
     if category is not None:
         selected.extend(CATEGORY_AUTHORITY_MAP.get(category, []))
+
     text = f"{title or ''} {description or ''}".lower()
     if text.strip():
         for auth_type in KEYWORD_AUTHORITY_HINTS:
             if _keyword_matches(text, auth_type) and auth_type not in selected:
                 selected.append(auth_type)
+
+        # An accident reported as severe (fire, trapped, explosion, etc.)
+        # always needs police + ambulance + fire on scene.
+        if category == IncidentCategory.ACCIDENT and any(p in text for p in SEVERITY_PHRASES):
+            for auth in (AuthorityType.POLICE, AuthorityType.HEALTH, AuthorityType.FIRE_DEPARTMENT):
+                if auth not in selected:
+                    selected.append(auth)
+
     if not selected:
         selected.append(AuthorityType.CIVIL_PROTECTION)
     return selected
