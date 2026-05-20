@@ -20,6 +20,7 @@ from services.notification import (
     CATEGORY_AUTHORITY_MAP,
 )
 from services.authority_offices import nearest_offices
+from services.events import publish
 
 router = APIRouter(prefix="/api/incidents", tags=["Incidents"])
 
@@ -71,6 +72,20 @@ async def create_incident(
     db.refresh(incident)
 
     create_incident_notification(db, incident)
+
+    # Find the nearest physical office of each responsible authority so the
+    # dispatcher closest to the scene is the one actually paged.
+    auth_types = detect_authorities(incident.title, incident.description, incident.category)
+    nearest = nearest_offices(incident.latitude, incident.longitude, auth_types, limit=len(auth_types) or 1)
+    publish(
+        "incident_created",
+        incident_id=incident.id,
+        category=incident.category.value,
+        status=incident.status.value,
+        latitude=incident.latitude,
+        longitude=incident.longitude,
+        nearest_offices=nearest,
+    )
 
     return incident
 
@@ -132,6 +147,7 @@ def update_incident(
     from services.notification import create_status_notification
     create_status_notification(db, incident)
 
+    publish("incident_updated", incident_id=incident.id, status=incident.status.value)
     return incident
 
 
@@ -142,6 +158,7 @@ def delete_incident(incident_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Incident not found")
     db.delete(incident)
     db.commit()
+    publish("incident_deleted", incident_id=incident_id)
     return {"detail": "Incident deleted"}
 
 
@@ -241,6 +258,7 @@ def create_incident_report(
 
     db.commit()
     db.refresh(report)
+    publish("report_created", incident_id=incident_id, report_id=report.id)
     return report
 
 
@@ -278,6 +296,7 @@ def update_incident_report(
 
     db.commit()
     db.refresh(report)
+    publish("report_updated", incident_id=incident_id, report_id=report_id)
     return report
 
 
@@ -292,4 +311,5 @@ def delete_incident_report(incident_id: int, report_id: int, db: Session = Depen
         raise HTTPException(status_code=404, detail="Report not found")
     db.delete(report)
     db.commit()
+    publish("report_deleted", incident_id=incident_id, report_id=report_id)
     return {"detail": "Report deleted"}

@@ -8,6 +8,8 @@ import {
   updateIncident,
 } from '../services/api';
 import { CATEGORY_COLORS, STATUS_LABELS } from '../components/IncidentMap';
+import { useToast, useConfirm } from '../components/Notifications';
+import { useLiveIncidents } from '../hooks/useLiveIncidents';
 import {
   ClipboardCheck, AlertTriangle, CheckCircle, Loader, Filter, RefreshCw,
   X, Send, MapPin, Clock, ChevronDown, ChevronUp, Pencil, Trash2, ShieldCheck, Lock,
@@ -36,6 +38,8 @@ const OUTCOME_BADGE_CLASS = {
 
 export default function Attendance() {
   const authority = JSON.parse(localStorage.getItem('authority') || '{}');
+  const toast = useToast();
+  const confirmDialog = useConfirm();
   const [incidents, setIncidents] = useState([]);
   const [reportsByIncident, setReportsByIncident] = useState({});
   const [loading, setLoading] = useState(true);
@@ -76,6 +80,8 @@ export default function Attendance() {
 
   useEffect(() => { fetchIncidents(); }, [statusFilter, scope]);
 
+  useLiveIncidents(() => { fetchIncidents(); });
+
   const refreshReportsFor = async (incidentId) => {
     try {
       const r = await getIncidentReports(incidentId);
@@ -112,14 +118,23 @@ export default function Attendance() {
       });
       setLogForm({ ...logForm, notes: '' });
       await refreshReportsFor(incidentId);
+      toast.success(`Attendance logged for incident #${incidentId}.`);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to submit attendance.');
+      const msg = err.response?.data?.detail || 'Failed to submit attendance.';
+      setError(msg);
+      toast.error(msg);
     }
     setSubmittingId(null);
   };
 
   const flagFalseAlarm = async (incidentId) => {
-    if (!confirm('Flag this incident as a false alarm?')) return;
+    const ok = await confirmDialog({
+      title: 'Flag false alarm?',
+      message: 'This will mark the incident as a false alarm.',
+      confirmLabel: 'Flag false alarm',
+      tone: 'danger',
+    });
+    if (!ok) return;
     setError('');
     if (!authority.authority_type) {
       setError('Could not determine your authority. Please re-login.');
@@ -138,8 +153,11 @@ export default function Attendance() {
       });
       await refreshReportsFor(incidentId);
       fetchIncidents();
+      toast.success(`Incident #${incidentId} flagged as false alarm.`);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to flag.');
+      const msg = err.response?.data?.detail || 'Failed to flag.';
+      setError(msg);
+      toast.error(msg);
     }
     setSubmittingId(null);
   };
@@ -169,8 +187,11 @@ export default function Attendance() {
       });
       await refreshReportsFor(editing.incidentId);
       setEditing(null);
+      toast.success('Attendance updated.');
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to update attendance.');
+      const msg = err.response?.data?.detail || 'Failed to update attendance.';
+      setError(msg);
+      toast.error(msg);
     }
     setBusyReportId(null);
   };
@@ -183,22 +204,34 @@ export default function Attendance() {
         is_validated: !report.is_validated,
       });
       await refreshReportsFor(incidentId);
+      toast.success(report.is_validated ? 'Validation cleared.' : 'Attendance validated.');
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to validate attendance.');
+      const msg = err.response?.data?.detail || 'Failed to validate attendance.';
+      setError(msg);
+      toast.error(msg);
     }
     setBusyReportId(null);
   };
 
   const closeReport = async (incidentId, report) => {
-    if (!confirm('Close this attendance entry? The incident will be marked resolved (or fake if false alarm).')) return;
+    const ok = await confirmDialog({
+      title: 'Close this attendance?',
+      message: 'The incident will be marked resolved (or fake if it was a false alarm).',
+      confirmLabel: 'Close attendance',
+      tone: 'primary',
+    });
+    if (!ok) return;
     setError('');
     setBusyReportId(report.id);
     try {
       await updateIncidentReport(incidentId, report.id, { is_closed: true });
       await refreshReportsFor(incidentId);
       fetchIncidents();
+      toast.success(`Attendance closed for incident #${incidentId}.`);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to close attendance.');
+      const msg = err.response?.data?.detail || 'Failed to close attendance.';
+      setError(msg);
+      toast.error(msg);
     }
     setBusyReportId(null);
   };
@@ -209,21 +242,33 @@ export default function Attendance() {
     try {
       await updateIncidentReport(incidentId, report.id, { is_closed: false });
       await refreshReportsFor(incidentId);
+      toast.success('Attendance reopened.');
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to reopen attendance.');
+      const msg = err.response?.data?.detail || 'Failed to reopen attendance.';
+      setError(msg);
+      toast.error(msg);
     }
     setBusyReportId(null);
   };
 
   const removeReport = async (incidentId, report) => {
-    if (!confirm(`Delete attendance entry by ${report.responder_name}? This cannot be undone.`)) return;
+    const ok = await confirmDialog({
+      title: 'Delete attendance?',
+      message: `Delete the attendance entry by ${report.responder_name}? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    });
+    if (!ok) return;
     setError('');
     setBusyReportId(report.id);
     try {
       await deleteIncidentReport(incidentId, report.id);
       await refreshReportsFor(incidentId);
+      toast.success('Attendance entry deleted.');
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to delete attendance.');
+      const msg = err.response?.data?.detail || 'Failed to delete attendance.';
+      setError(msg);
+      toast.error(msg);
     }
     setBusyReportId(null);
   };

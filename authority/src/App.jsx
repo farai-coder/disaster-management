@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import AuthorityLayout from './components/AuthorityLayout';
+import { NotificationsProvider } from './components/Notifications';
 import AuthorityLogin from './pages/AuthorityLogin';
 import AuthoritySignup from './pages/AuthoritySignup';
 import Dashboard from './pages/Dashboard';
@@ -12,6 +13,7 @@ import AccountSettings from './pages/AccountSettings';
 
 function App() {
   return (
+    <NotificationsProvider>
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<AuthorityLogin />} />
@@ -28,6 +30,7 @@ function App() {
         </Route>
       </Routes>
     </BrowserRouter>
+    </NotificationsProvider>
   );
 }
 

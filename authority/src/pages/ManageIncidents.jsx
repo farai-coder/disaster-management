@@ -2,12 +2,16 @@ import { useState, useEffect } from 'react';
 import { getIncidents, updateIncident, deleteIncident, getNearestAuthorities, getIncidentReports, UPLOAD_BASE } from '../services/api';
 import { CATEGORY_COLORS, STATUS_LABELS } from '../components/IncidentMap';
 import IncidentMap from '../components/IncidentMap';
+import { useToast, useConfirm } from '../components/Notifications';
+import { useLiveIncidents } from '../hooks/useLiveIncidents';
 import {
   Filter, CheckCircle, XCircle, Loader,
   Trash2, Eye, MapPin, Clock, Phone, Navigation,
 } from 'lucide-react';
 
 export default function ManageIncidents() {
+  const toast = useToast();
+  const confirm = useConfirm();
   const [incidents, setIncidents] = useState([]);
   const [filter, setFilter] = useState({ category: '', status: '' });
   const [selected, setSelected] = useState(null);
@@ -42,6 +46,8 @@ export default function ManageIncidents() {
     fetchIncidents();
   }, [filter]);
 
+  useLiveIncidents(fetchIncidents);
+
   const openIncident = async (inc) => {
     setSelected(inc);
     setNearby([]);
@@ -66,20 +72,28 @@ export default function ManageIncidents() {
       if (selected?.id === id) {
         setSelected({ ...selected, status });
       }
+      toast.success(`Incident #${id} marked ${STATUS_LABELS[status] || status}.`);
     } catch {
-      // ignore
+      toast.error('Could not update incident status.');
     }
     setUpdating(null);
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Are you sure you want to delete this incident?')) return;
+    const ok = await confirm({
+      title: 'Delete incident?',
+      message: `Permanently remove incident #${id}? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    });
+    if (!ok) return;
     try {
       await deleteIncident(id);
       setIncidents((prev) => prev.filter((i) => i.id !== id));
       if (selected?.id === id) setSelected(null);
+      toast.success(`Incident #${id} deleted.`);
     } catch {
-      // ignore
+      toast.error('Failed to delete incident.');
     }
   };
 

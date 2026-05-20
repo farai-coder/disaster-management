@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getDashboardStats, getNotifications, markNotificationRead, getAlerts } from '../services/api';
 import IncidentMap from '../components/IncidentMap';
+import { useLiveIncidents } from '../hooks/useLiveIncidents';
+import { useToast } from '../components/Notifications';
 import {
   BarChart3, AlertTriangle, CheckCircle, Clock, XCircle,
   Bell, LayoutDashboard, Loader,
@@ -17,11 +19,13 @@ const AUTHORITY_ICONS = {
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const toast = useToast();
   const [authority, setAuthority] = useState(null);
   const [stats, setStats] = useState(null);
   const [notifications, setNotifications] = useState([]);
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const authTypeRef = useRef(null);
 
   useEffect(() => {
     const stored = localStorage.getItem('authority');
@@ -31,10 +35,19 @@ export default function Dashboard() {
     }
     const auth = JSON.parse(stored);
     setAuthority(auth);
+    authTypeRef.current = auth.authority_type;
     fetchData(auth.authority_type);
     const pollNotifs = setInterval(() => pollNotifications(auth.authority_type), 12000);
     return () => clearInterval(pollNotifs);
   }, []);
+
+  useLiveIncidents((msg) => {
+    if (!authTypeRef.current) return;
+    pollNotifications(authTypeRef.current);
+    if (msg?.type === 'incident_created') {
+      toast.info('New incident reported.', { title: 'Live update' });
+    }
+  });
 
   const fetchData = async (authorityType) => {
     try {

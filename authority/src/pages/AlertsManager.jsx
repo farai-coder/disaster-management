@@ -1,9 +1,13 @@
 import { useState, useEffect } from 'react';
 import { createAlert, getAlerts, deactivateAlert, deleteAlert } from '../services/api';
+import { useToast, useConfirm } from '../components/Notifications';
+import { useLiveIncidents } from '../hooks/useLiveIncidents';
 import { Send, Loader, AlertTriangle, Trash2, Power, RefreshCw, PlusCircle } from 'lucide-react';
 
 export default function AlertsManager() {
   const authority = JSON.parse(localStorage.getItem('authority') || '{}');
+  const toast = useToast();
+  const confirm = useConfirm();
 
   const [alerts, setAlerts] = useState([]);
   const [activeOnly, setActiveOnly] = useState(false);
@@ -21,8 +25,6 @@ export default function AlertsManager() {
     radius_km: null,
   });
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
 
   const fetchAlerts = async () => {
     setLoading(true);
@@ -35,10 +37,11 @@ export default function AlertsManager() {
 
   useEffect(() => { fetchAlerts(); }, [activeOnly]);
 
+  useLiveIncidents(fetchAlerts, ['alert_changed']);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
-    setError(''); setSuccess('');
     try {
       const payload = { ...form };
       if (!payload.category) delete payload.category;
@@ -48,25 +51,41 @@ export default function AlertsManager() {
         delete payload.radius_km;
       }
       await createAlert(payload, authority.id);
-      setSuccess('Alert issued successfully!');
+      toast.success('Alert issued.');
       setForm({ title: '', message: '', severity: 'medium', category: '', target_area: '', latitude: null, longitude: null, radius_km: null });
       setShowForm(false);
       fetchAlerts();
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to create alert');
+      toast.error(err.response?.data?.detail || 'Failed to create alert.');
     }
     setSubmitting(false);
   };
 
   const handleDeactivate = async (id) => {
-    await deactivateAlert(id);
-    fetchAlerts();
+    try {
+      await deactivateAlert(id);
+      toast.success(`Alert #${id} deactivated.`);
+      fetchAlerts();
+    } catch {
+      toast.error('Failed to deactivate alert.');
+    }
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Permanently delete this alert?')) return;
-    await deleteAlert(id);
-    setAlerts((prev) => prev.filter((a) => a.id !== id));
+    const ok = await confirm({
+      title: 'Delete alert?',
+      message: 'This alert will be permanently removed for everyone.',
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    });
+    if (!ok) return;
+    try {
+      await deleteAlert(id);
+      setAlerts((prev) => prev.filter((a) => a.id !== id));
+      toast.success(`Alert #${id} deleted.`);
+    } catch {
+      toast.error('Failed to delete alert.');
+    }
   };
 
   return (
@@ -86,8 +105,6 @@ export default function AlertsManager() {
       {showForm && (
         <div className="dashboard-section">
           <h2><AlertTriangle size={18} /> Issue Emergency Alert</h2>
-          {error && <div className="alert alert-error">{error}</div>}
-          {success && <div className="alert alert-success">{success}</div>}
           <form onSubmit={handleSubmit} className="alert-form">
             <div className="form-group">
               <label>Alert Title <span className="req">*</span></label>

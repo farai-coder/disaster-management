@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { getAllResponderReports, deleteIncidentReport } from '../services/api';
 import { CATEGORY_COLORS } from '../components/IncidentMap';
+import { useToast, useConfirm } from '../components/Notifications';
+import { useLiveIncidents } from '../hooks/useLiveIncidents';
 import { ClipboardCheck, AlertTriangle, CheckCircle, Loader, Filter, RefreshCw, Trash2 } from 'lucide-react';
 
 const OUTCOME_LABELS = {
@@ -24,7 +26,8 @@ export default function Responders() {
   const [scope, setScope] = useState('mine'); // 'mine' or 'all'
   const [outcomeFilter, setOutcomeFilter] = useState('');
   const [deletingId, setDeletingId] = useState(null);
-  const [error, setError] = useState('');
+  const toast = useToast();
+  const confirmDialog = useConfirm();
 
   const fetchReports = async () => {
     setLoading(true);
@@ -43,15 +46,23 @@ export default function Responders() {
 
   useEffect(() => { fetchReports(); }, [scope]);
 
+  useLiveIncidents(fetchReports);
+
   const handleDelete = async (report) => {
-    if (!confirm(`Delete responder report by ${report.responder_name}? This cannot be undone.`)) return;
-    setError('');
+    const ok = await confirmDialog({
+      title: 'Delete responder report?',
+      message: `Delete the report by ${report.responder_name}? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    });
+    if (!ok) return;
     setDeletingId(report.id);
     try {
       await deleteIncidentReport(report.incident_id, report.id);
       setReports((prev) => prev.filter((r) => r.id !== report.id));
+      toast.success('Report deleted.');
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to delete report.');
+      toast.error(err.response?.data?.detail || 'Failed to delete report.');
     }
     setDeletingId(null);
   };
@@ -112,8 +123,6 @@ export default function Responders() {
         </select>
         <span className="incident-count">{filtered.length} reports</span>
       </div>
-
-      {error && <div className="alert alert-error" style={{ marginTop: 12 }}>{error}</div>}
 
       <div className="incidents-table-wrapper" style={{ marginTop: 12 }}>
         {loading ? (

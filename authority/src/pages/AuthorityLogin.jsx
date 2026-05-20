@@ -1,7 +1,17 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { loginAuthority } from '../services/api';
-import { Shield, LogIn, Loader, UserPlus } from 'lucide-react';
+import {
+  Shield, LogIn, Loader, UserPlus,
+  Flame, HeartPulse, ShieldAlert,
+} from 'lucide-react';
+
+const AUTHORITY_CHIPS = [
+  { type: 'police',           Icon: Shield,       label: 'Police',          dept: 'ZRP',                color: '#1d4ed8', defaultUser: 'police_admin' },
+  { type: 'fire_department',  Icon: Flame,        label: 'Fire Department', dept: 'City Fire',          color: '#b91c1c', defaultUser: 'fire_admin'   },
+  { type: 'health',           Icon: HeartPulse,   label: 'Health',          dept: 'Ministry of Health', color: '#047857', defaultUser: 'health_admin' },
+  { type: 'civil_protection', Icon: ShieldAlert,  label: 'Civil Protection',dept: 'DCP',                color: '#6d28d9', defaultUser: 'civil_admin'  },
+];
 
 export default function AuthorityLogin() {
   const navigate = useNavigate();
@@ -9,6 +19,7 @@ export default function AuthorityLogin() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [selectedType, setSelectedType] = useState(null);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -26,13 +37,41 @@ export default function AuthorityLogin() {
     setLoading(false);
   };
 
+  const pickAuthority = (chip) => {
+    setSelectedType(chip.type);
+    setUsername(chip.defaultUser);
+  };
+
   return (
     <div className="login-page-standalone">
       <div className="login-card">
+        <div className="zim-flag-stripe" style={{ borderTopLeftRadius: 'var(--radius-lg)', borderTopRightRadius: 'var(--radius-lg)' }} />
         <div className="login-header">
           <Shield size={40} />
           <h1>Authority Login</h1>
-          <p>Access the disaster management dashboard</p>
+          <p>Choose your authority and sign in</p>
+        </div>
+
+        <div className="authority-chooser">
+          {AUTHORITY_CHIPS.map((chip) => {
+            const Icon = chip.Icon;
+            return (
+              <button
+                key={chip.type}
+                type="button"
+                className={`authority-chip ${selectedType === chip.type ? 'active' : ''}`}
+                onClick={() => pickAuthority(chip)}
+              >
+                <span className="authority-chip-badge" style={{ background: chip.color }}>
+                  <Icon size={18} />
+                </span>
+                <span className="authority-chip-text">
+                  <strong>{chip.label}</strong>
+                  <small>{chip.dept}</small>
+                </span>
+              </button>
+            );
+          })}
         </div>
 
         {error && <div className="alert alert-error">{error}</div>}

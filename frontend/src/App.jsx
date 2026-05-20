@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import PublicLayout from './components/PublicLayout';
+import { NotificationsProvider } from './components/Notifications';
 import Home from './pages/Home';
 import ReportIncident from './pages/ReportIncident';
 import LiveMap from './pages/LiveMap';
@@ -9,6 +10,7 @@ import ResponderReport from './pages/ResponderReport';
 
 function App() {
   return (
+    <NotificationsProvider>
     <BrowserRouter>
       <Routes>
         <Route element={<PublicLayout />}>
@@ -21,6 +23,7 @@ function App() {
         </Route>
       </Routes>
     </BrowserRouter>
+    </NotificationsProvider>
   );
 }
 

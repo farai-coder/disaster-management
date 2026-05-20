@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { MapPin, Send, Eye, EyeOff, Loader, Camera, Image as ImageIcon, X, AlertTriangle } from 'lucide-react';
 import { createIncident } from '../services/api';
 import IncidentMap from '../components/IncidentMap';
+import { useToast } from '../components/Notifications';
 
 const CATEGORIES = [
   { value: 'crime', label: 'Crime' },
@@ -45,6 +46,17 @@ function looksLikeGibberish(text) {
   return false;
 }
 
+const NON_INCIDENT_PATTERNS = [
+  /^(hi|hello|hey|yo+|test+|testing|asdf+|qwerty|abc+)\b/i,
+  /\b(lorem ipsum|just testing|ignore this|please ignore)\b/i,
+];
+
+function looksLikeNonIncident(text) {
+  const t = (text || '').trim();
+  if (t.length < 4) return false;
+  return NON_INCIDENT_PATTERNS.some((re) => re.test(t));
+}
+
 function detectCategoryFromText(text) {
   const d = (text || '').toLowerCase();
   if (d.length < 5) return null;
@@ -71,6 +83,9 @@ function validateReport(form, photo) {
   }
   if (desc && looksLikeGibberish(desc)) {
     errors.push('Description looks like random characters. Please describe what happened in plain words.');
+  }
+  if (desc && looksLikeNonIncident(desc)) {
+    warnings.push('Your description looks like a test message, not a real incident report. Submit anyway?');
   }
 
   const lat = Number(form.latitude);
@@ -115,6 +130,7 @@ function validateReport(form, photo) {
 
 export default function ReportIncident() {
   const navigate = useNavigate();
+  const toast = useToast();
   const [form, setForm] = useState({
     title: '',
     description: '',
@@ -337,10 +353,13 @@ export default function ReportIncident() {
       if (photo) fd.append('photo', photo);
 
       const res = await createIncident(fd);
+      toast.success(`Report saved. Reference #${res.data.id}.`, { title: 'Submitted' });
       setSuccess(`Report submitted. Reference #${res.data.id}.`);
       setTimeout(() => navigate('/track', { state: { incidentId: res.data.id } }), 1200);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to submit report');
+      const msg = err.response?.data?.detail || 'Failed to submit report';
+      setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }

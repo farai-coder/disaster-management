@@ -1,5 +1,6 @@
 import os
 import json
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,6 +12,7 @@ from database import engine, Base, SessionLocal
 from models import Authority, AuthorityType
 from passlib.context import CryptContext
 from routers import incidents, alerts, authorities
+from services.events import register_publisher
 
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -73,20 +75,34 @@ def seed_default_authorities():
 class ConnectionManager:
     def __init__(self):
         self.active_connections: list[WebSocket] = []
+        self._loop: asyncio.AbstractEventLoop | None = None
+
+    def attach_loop(self, loop: asyncio.AbstractEventLoop):
+        self._loop = loop
 
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
         self.active_connections.append(websocket)
 
     def disconnect(self, websocket: WebSocket):
-        self.active_connections.remove(websocket)
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
 
     async def broadcast(self, message: dict):
-        for connection in self.active_connections:
+        for connection in list(self.active_connections):
             try:
                 await connection.send_json(message)
             except Exception:
                 pass
+
+    def broadcast_sync(self, message: dict):
+        """Schedule a broadcast from sync code (e.g. router endpoints)."""
+        if not self._loop:
+            return
+        try:
+            asyncio.run_coroutine_threadsafe(self.broadcast(message), self._loop)
+        except Exception:
+            pass
 
 
 ws_manager = ConnectionManager()
@@ -97,6 +113,8 @@ async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
     run_lightweight_migrations()
     seed_default_authorities()
+    ws_manager.attach_loop(asyncio.get_running_loop())
+    register_publisher(ws_manager.broadcast_sync)
     yield
 
 

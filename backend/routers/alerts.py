@@ -8,6 +8,7 @@ from database import get_db
 from models import Alert
 from schemas import AlertCreate, AlertResponse
 from services.notification import create_alert_notification, simulate_sms_alert
+from services.events import publish
 
 router = APIRouter(prefix="/api/alerts", tags=["Alerts"])
 
@@ -27,6 +28,7 @@ def create_alert(
     db.refresh(alert)
 
     create_alert_notification(db, alert)
+    publish("alert_changed", alert_id=alert.id, severity=alert.severity)
 
     return alert
 
@@ -65,6 +67,7 @@ def deactivate_alert(alert_id: int, db: Session = Depends(get_db)):
     alert.is_active = False
     db.commit()
     db.refresh(alert)
+    publish("alert_changed", alert_id=alert.id, action="deactivated")
     return alert
 
 
@@ -75,6 +78,7 @@ def delete_alert(alert_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Alert not found")
     db.delete(alert)
     db.commit()
+    publish("alert_changed", alert_id=alert_id, action="deleted")
     return {"detail": "Alert deleted"}
 
 

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { getIncidents, getNearestAuthorities } from '../services/api';
 import IncidentMap, { CATEGORY_COLORS, STATUS_LABELS } from '../components/IncidentMap';
-import { RefreshCw, Filter, Navigation, Phone, Shield, X } from 'lucide-react';
+import { useLiveIncidents } from '../hooks/useLiveIncidents';
+import { RefreshCw, Filter, Navigation, Phone, Shield, X, Clock, MapPin } from 'lucide-react';
 
 export default function LiveMap() {
   const [incidents, setIncidents] = useState([]);
@@ -35,6 +36,8 @@ export default function LiveMap() {
     const interval = setInterval(fetchIncidents, 30000);
     return () => clearInterval(interval);
   }, [filter]);
+
+  useLiveIncidents(fetchIncidents);
 
   const handleSelect = async (inc) => {
     setSelected(inc);
@@ -192,14 +195,35 @@ export default function LiveMap() {
               </button>
             )}
           </div>
-          {(routeLabel || routeError || routeSummary) && (
-            <div style={{ marginTop: 8, fontSize: '0.85rem', color: '#4b5563' }}>
-              {routeError && <span style={{ color: '#dc2626' }}>{routeError}</span>}
-              {!routeError && routeLabel && (
-                <span>
-                  Route: <strong>{routeLabel}</strong>
-                  {routeSummary && ` · ${routeSummary.distance_km.toFixed(1)} km · ~${Math.round(routeSummary.duration_min)} min by road`}
-                </span>
+          {routeError && (
+            <div className="route-summary route-summary-error" style={{ marginTop: 10 }}>
+              {routeError}
+            </div>
+          )}
+          {!routeError && routeLabel && (
+            <div className="route-summary" style={{ marginTop: 10 }}>
+              <div className="route-summary-head">
+                <Navigation size={16} />
+                <strong>{routeLabel}</strong>
+              </div>
+              {routeSummary && (
+                <div className="route-summary-stats">
+                  <span><MapPin size={13} /> {routeSummary.distance_km.toFixed(1)} km</span>
+                  <span><Clock size={13} /> ~{Math.round(routeSummary.duration_min)} min by road</span>
+                </div>
+              )}
+              {routeSummary?.steps?.length > 0 && (
+                <details className="route-steps">
+                  <summary>Turn-by-turn ({routeSummary.steps.length} steps)</summary>
+                  <ol>
+                    {routeSummary.steps.slice(0, 12).map((s, i) => (
+                      <li key={i}>
+                        <span className="step-text">{s.instruction || 'continue'}</span>
+                        <span className="step-meta">{(s.distance_m / 1000).toFixed(2)} km</span>
+                      </li>
+                    ))}
+                  </ol>
+                </details>
               )}
             </div>
           )}

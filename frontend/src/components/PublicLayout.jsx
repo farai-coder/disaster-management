@@ -29,6 +29,7 @@ export default function PublicLayout() {
 
   return (
     <div className={`app-layout ${collapsed ? 'sidebar-collapsed' : ''}`}>
+      <div className="zim-flag-stripe" style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 5000 }} />
       {mobileOpen && (
         <div className="sidebar-overlay" onClick={() => setMobileOpen(false)} />
       )}
