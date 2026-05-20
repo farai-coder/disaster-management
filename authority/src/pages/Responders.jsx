@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { getAllResponderReports } from '../services/api';
-import { CATEGORY_COLORS, STATUS_LABELS } from '../components/IncidentMap';
-import { ClipboardCheck, AlertTriangle, CheckCircle, Loader, Filter, RefreshCw } from 'lucide-react';
+import { getAllResponderReports, deleteIncidentReport } from '../services/api';
+import { CATEGORY_COLORS } from '../components/IncidentMap';
+import { ClipboardCheck, AlertTriangle, CheckCircle, Loader, Filter, RefreshCw, Trash2 } from 'lucide-react';
 
 const OUTCOME_LABELS = {
   genuine: 'Genuine',
@@ -23,6 +23,8 @@ export default function Responders() {
   const [loading, setLoading] = useState(true);
   const [scope, setScope] = useState('mine'); // 'mine' or 'all'
   const [outcomeFilter, setOutcomeFilter] = useState('');
+  const [deletingId, setDeletingId] = useState(null);
+  const [error, setError] = useState('');
 
   const fetchReports = async () => {
     setLoading(true);
@@ -40,6 +42,19 @@ export default function Responders() {
   };
 
   useEffect(() => { fetchReports(); }, [scope]);
+
+  const handleDelete = async (report) => {
+    if (!confirm(`Delete responder report by ${report.responder_name}? This cannot be undone.`)) return;
+    setError('');
+    setDeletingId(report.id);
+    try {
+      await deleteIncidentReport(report.incident_id, report.id);
+      setReports((prev) => prev.filter((r) => r.id !== report.id));
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to delete report.');
+    }
+    setDeletingId(null);
+  };
 
   const filtered = outcomeFilter
     ? reports.filter((r) => r.outcome === outcomeFilter)
@@ -98,6 +113,8 @@ export default function Responders() {
         <span className="incident-count">{filtered.length} reports</span>
       </div>
 
+      {error && <div className="alert alert-error" style={{ marginTop: 12 }}>{error}</div>}
+
       <div className="incidents-table-wrapper" style={{ marginTop: 12 }}>
         {loading ? (
           <div className="loading-center"><Loader size={24} className="spin" /></div>
@@ -115,6 +132,7 @@ export default function Responders() {
                 <th>False alarm</th>
                 <th>Notes</th>
                 <th>Date</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -146,6 +164,16 @@ export default function Responders() {
                     {r.notes || '—'}
                   </td>
                   <td>{new Date(r.created_at).toLocaleString()}</td>
+                  <td>
+                    <button
+                      className="btn btn-sm btn-danger"
+                      onClick={() => handleDelete(r)}
+                      disabled={deletingId === r.id}
+                      title="Delete report"
+                    >
+                      {deletingId === r.id ? <Loader size={12} className="spin" /> : <Trash2 size={12} />}
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>

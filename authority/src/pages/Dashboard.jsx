@@ -5,7 +5,15 @@ import IncidentMap from '../components/IncidentMap';
 import {
   BarChart3, AlertTriangle, CheckCircle, Clock, XCircle,
   Bell, LayoutDashboard, Loader,
+  Shield, Flame, HeartPulse, ShieldAlert,
 } from 'lucide-react';
+
+const AUTHORITY_ICONS = {
+  police: { Icon: Shield, color: '#1d4ed8', bg: '#dbeafe', label: 'Police' },
+  fire_department: { Icon: Flame, color: '#b91c1c', bg: '#fee2e2', label: 'Fire Department' },
+  health: { Icon: HeartPulse, color: '#047857', bg: '#d1fae5', label: 'Health / Ambulance' },
+  civil_protection: { Icon: ShieldAlert, color: '#6d28d9', bg: '#ede9fe', label: 'Civil Protection' },
+};
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -76,15 +84,43 @@ export default function Dashboard() {
     );
   }
 
+  const authIcon = AUTHORITY_ICONS[authority?.authority_type];
+  const AuthorityIcon = authIcon?.Icon || LayoutDashboard;
+
   return (
     <div className="page dashboard-page">
       <div className="dashboard-header">
-        <div>
-          <h1>
-            <LayoutDashboard size={28} />
-            {authority?.name || 'Dashboard'}
-          </h1>
-          <p className="authority-type">{authority?.department} - {authority?.authority_type?.replace('_', ' ')}</p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          {authIcon && (
+            <div
+              className="authority-icon-badge"
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: 16,
+                background: authIcon.bg,
+                color: authIcon.color,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+                boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+              }}
+              title={authIcon.label}
+              aria-label={authIcon.label}
+            >
+              <AuthorityIcon size={30} />
+            </div>
+          )}
+          <div>
+            <h1>
+              <LayoutDashboard size={28} />
+              {authority?.name || 'Dashboard'}
+            </h1>
+            <p className="authority-type">
+              {authority?.department} - {authority?.authority_type?.replace('_', ' ')}
+            </p>
+          </div>
         </div>
       </div>
 

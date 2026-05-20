@@ -34,7 +34,6 @@ class IncidentResponse(BaseModel):
     longitude: float
     location_name: Optional[str]
     photo_url: Optional[str]
-    ai_suggested_category: Optional[IncidentCategory]
     is_anonymous: bool
     reporter_name: Optional[str]
     reporter_contact: Optional[str]
@@ -106,6 +105,16 @@ class IncidentReportCreate(BaseModel):
     is_false_alarm: bool = False
 
 
+class IncidentReportUpdate(BaseModel):
+    responder_name: Optional[str] = Field(None, min_length=2, max_length=120)
+    responder_authority: Optional[AuthorityType] = None
+    outcome: Optional[str] = Field(None, pattern="^(genuine|false_alarm|duplicate|resolved)$")
+    notes: Optional[str] = None
+    is_false_alarm: Optional[bool] = None
+    is_validated: Optional[bool] = None
+    is_closed: Optional[bool] = None
+
+
 class IncidentReportResponse(BaseModel):
     id: int
     incident_id: int
@@ -115,6 +124,8 @@ class IncidentReportResponse(BaseModel):
     outcome: str
     notes: Optional[str]
     is_false_alarm: bool
+    is_validated: bool = False
+    is_closed: bool = False
     created_at: datetime
 
     model_config = {"from_attributes": True}

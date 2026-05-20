@@ -5,6 +5,8 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from sqlalchemy import inspect, text
+
 from database import engine, Base, SessionLocal
 from models import Authority, AuthorityType
 from passlib.context import CryptContext
@@ -12,6 +14,23 @@ from routers import incidents, alerts, authorities
 
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+
+def run_lightweight_migrations():
+    """Add new columns to existing tables on startup (SQLite only)."""
+    inspector = inspect(engine)
+    existing_cols = {col["name"] for col in inspector.get_columns("incident_reports")} if inspector.has_table("incident_reports") else set()
+    additions = []
+    if "is_validated" not in existing_cols:
+        additions.append("ALTER TABLE incident_reports ADD COLUMN is_validated BOOLEAN DEFAULT 0")
+    if "is_closed" not in existing_cols:
+        additions.append("ALTER TABLE incident_reports ADD COLUMN is_closed BOOLEAN DEFAULT 0")
+    if "updated_at" not in existing_cols:
+        additions.append("ALTER TABLE incident_reports ADD COLUMN updated_at DATETIME")
+    if additions:
+        with engine.begin() as conn:
+            for stmt in additions:
+                conn.execute(text(stmt))
 
 
 def seed_default_authorities():
@@ -76,6 +95,7 @@ ws_manager = ConnectionManager()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
+    run_lightweight_migrations()
     seed_default_authorities()
     yield
 

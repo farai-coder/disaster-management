@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapPin, Send, Eye, EyeOff, Loader, Camera, Image as ImageIcon, X } from 'lucide-react';
+import { MapPin, Send, Eye, EyeOff, Loader, Camera, Image as ImageIcon, X, AlertTriangle } from 'lucide-react';
 import { createIncident } from '../services/api';
 import IncidentMap from '../components/IncidentMap';
 
@@ -13,6 +13,105 @@ const CATEGORIES = [
   { value: 'drought', label: 'Drought' },
   { value: 'other', label: 'Other' },
 ];
+
+const CATEGORY_LABEL = Object.fromEntries(CATEGORIES.map((c) => [c.value, c.label]));
+
+const CATEGORY_KEYWORDS = {
+  crime: ['steal', 'stole', 'rob', 'mug', 'assault', 'attack', 'gun', 'knife', 'gunshot', 'shot', 'shoot', 'thief', 'theft', 'kidnap', 'murder', 'stab', 'rape', 'break in', 'burglar'],
+  fire: ['fire', 'burn', 'burning', 'flame', 'smoke', 'blaze', 'arson'],
+  accident: ['accident', 'crash', 'collision', 'collid', 'hit and run', 'overturn', 'rollover', 'pile-up', 'pileup', 'rear-end'],
+  disease_outbreak: ['cholera', 'outbreak', 'sick', 'disease', 'epidemic', 'malaria', 'covid', 'typhoid', 'measles', 'diarrh', 'vomit'],
+  cyclone_flood: ['flood', 'flooded', 'cyclone', 'storm', 'hurricane', 'drown', 'heavy rain', 'overflow'],
+  drought: ['drought', 'water shortage', 'crop failure', 'borehole dry', 'no rain'],
+};
+
+const DEFAULT_LAT = -17.8292;
+const DEFAULT_LON = 31.0522;
+const ZIM_BOUNDS = { minLat: -22.5, maxLat: -15.5, minLon: 25.0, maxLon: 33.1 };
+
+function looksLikeGibberish(text) {
+  const t = (text || '').trim();
+  if (t.length < 8) return false;
+  const letters = t.replace(/[^a-zA-Z]/g, '').toLowerCase();
+  if (letters.length < 6) return false;
+  const vowels = (letters.match(/[aeiou]/g) || []).length;
+  if (vowels / letters.length < 0.18) return true;
+  if (/(.)\1{4,}/i.test(t)) return true;
+  const uniq = new Set(letters.split(''));
+  if (letters.length >= 12 && uniq.size <= 4) return true;
+  const words = t.toLowerCase().split(/\s+/).filter(Boolean);
+  const noVowelLong = words.filter((w) => w.length >= 6 && !/[aeiou]/.test(w));
+  if (noVowelLong.length >= 2) return true;
+  return false;
+}
+
+function detectCategoryFromText(text) {
+  const d = (text || '').toLowerCase();
+  if (d.length < 5) return null;
+  let best = null;
+  let bestHits = 0;
+  for (const [cat, kws] of Object.entries(CATEGORY_KEYWORDS)) {
+    const hits = kws.reduce((n, kw) => (d.includes(kw) ? n + 1 : n), 0);
+    if (hits > bestHits) { bestHits = hits; best = cat; }
+  }
+  return bestHits >= 1 ? best : null;
+}
+
+function validateReport(form, photo) {
+  const errors = [];
+  const warnings = [];
+
+  const desc = (form.description || '').trim();
+  const hasPhoto = !!photo;
+
+  if (!desc && !hasPhoto) {
+    errors.push('Add a description or attach a photo so authorities know what happened.');
+  } else if (desc && desc.length < 10 && !hasPhoto) {
+    errors.push('Description is too short. Add a few more words or attach a photo.');
+  }
+  if (desc && looksLikeGibberish(desc)) {
+    errors.push('Description looks like random characters. Please describe what happened in plain words.');
+  }
+
+  const lat = Number(form.latitude);
+  const lon = Number(form.longitude);
+  const noLocationName = !(form.location_name || '').trim();
+  const isDefaultCoords = Math.abs(lat - DEFAULT_LAT) < 1e-4 && Math.abs(lon - DEFAULT_LON) < 1e-4;
+  if (Number.isNaN(lat) || Number.isNaN(lon)) {
+    errors.push('Latitude and longitude must be valid numbers.');
+  } else if (isDefaultCoords && noLocationName) {
+    errors.push('Set a location: use "Use My Current Location", search for a place, or tap on the map.');
+  } else if (lat < ZIM_BOUNDS.minLat || lat > ZIM_BOUNDS.maxLat || lon < ZIM_BOUNDS.minLon || lon > ZIM_BOUNDS.maxLon) {
+    warnings.push('Location appears to be outside Zimbabwe. Submit anyway?');
+  }
+
+  if (!form.is_anonymous) {
+    const name = (form.reporter_name || '').trim();
+    const contact = (form.reporter_contact || '').trim();
+    if (!name && !contact) {
+      warnings.push('You unchecked "Report anonymously" but left name and contact blank. Submit without contact info?');
+    } else if (contact) {
+      const looksEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact);
+      const looksPhone = /^\+?[\d\s\-()]{7,}$/.test(contact);
+      if (!looksEmail && !looksPhone) {
+        warnings.push('Contact doesn’t look like a valid phone number or email. Submit anyway?');
+      }
+    }
+  }
+
+  const detected = detectCategoryFromText(desc);
+  if (detected && form.category && form.category !== 'other' && detected !== form.category) {
+    warnings.push(`The description sounds like "${CATEGORY_LABEL[detected]}" but the category is set to "${CATEGORY_LABEL[form.category]}". Continue with current category?`);
+  } else if (detected && !form.category) {
+    warnings.push(`No category selected. The description sounds like "${CATEGORY_LABEL[detected]}". Submit without setting one?`);
+  }
+
+  if (desc && desc.length < 25 && !hasPhoto) {
+    warnings.push('Description is brief and there is no photo. More detail helps responders. Continue anyway?');
+  }
+
+  return { errors, warnings };
+}
 
 export default function ReportIncident() {
   const navigate = useNavigate();
@@ -33,6 +132,8 @@ export default function ReportIncident() {
   const [geoLoading, setGeoLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [issues, setIssues] = useState({ errors: [], warnings: [] });
+  const [ackKey, setAckKey] = useState('');
   const [suggestions, setSuggestions] = useState([]);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
@@ -132,7 +233,7 @@ export default function ReportIncident() {
       return;
     }
     if (!window.isSecureContext && window.location.hostname !== 'localhost') {
-      setCameraError('Live camera requires HTTPS. On a LAN address, use the "Take Photo" button instead — it opens your phone\'s camera directly.');
+      setCameraError('Live camera requires HTTPS. On a LAN address, use the "Take Photo" button instead. It opens your phone\'s camera directly.');
       setCameraOpen(true);
       return;
     }
@@ -186,11 +287,39 @@ export default function ReportIncident() {
     setForm((prev) => ({ ...prev, latitude: lat, longitude: lng }));
   };
 
+  const formSignature = () => JSON.stringify({
+    t: form.title.trim(),
+    d: form.description.trim(),
+    c: form.category,
+    lat: Number(form.latitude),
+    lon: Number(form.longitude),
+    loc: (form.location_name || '').trim(),
+    a: form.is_anonymous,
+    n: form.reporter_name.trim(),
+    k: form.reporter_contact.trim(),
+    p: photo?.name || '',
+  });
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    setLoading(true);
 
+    const result = validateReport(form, photo);
+    setIssues(result);
+    if (result.errors.length > 0) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    if (result.warnings.length > 0) {
+      const sig = formSignature();
+      if (ackKey !== sig) {
+        setAckKey(sig);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+    }
+
+    setLoading(true);
     try {
       const fd = new FormData();
       const title = form.title.trim() || 'Incident report';
@@ -226,6 +355,29 @@ export default function ReportIncident() {
 
       {error && <div className="alert alert-error">{error}</div>}
       {success && <div className="alert alert-success">{success}</div>}
+
+      {issues.errors.length > 0 && (
+        <div className="alert alert-error validation-block">
+          <AlertTriangle size={18} />
+          <div>
+            <strong>Please fix before submitting:</strong>
+            <ul className="validation-list">
+              {issues.errors.map((m, i) => <li key={i}>{m}</li>)}
+            </ul>
+          </div>
+        </div>
+      )}
+      {issues.errors.length === 0 && issues.warnings.length > 0 && (
+        <div className="alert alert-warning validation-block">
+          <AlertTriangle size={18} />
+          <div>
+            <strong>{ackKey ? 'Confirm. Click Submit again to send:' : 'Heads up:'}</strong>
+            <ul className="validation-list">
+              {issues.warnings.map((m, i) => <li key={i}>{m}</li>)}
+            </ul>
+          </div>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="report-form" noValidate>
         <div className="form-grid">
@@ -411,7 +563,11 @@ export default function ReportIncident() {
 
         <button type="submit" className="btn btn-primary btn-lg submit-btn" disabled={loading}>
           {loading ? <Loader size={20} className="spin" /> : <Send size={20} />}
-          {loading ? 'Submitting...' : 'Submit Report'}
+          {loading
+            ? 'Submitting...'
+            : (issues.errors.length === 0 && issues.warnings.length > 0 && ackKey === formSignature())
+              ? 'Submit Anyway'
+              : 'Submit Report'}
         </button>
       </form>
 

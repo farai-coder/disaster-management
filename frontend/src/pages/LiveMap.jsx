@@ -71,7 +71,7 @@ export default function LiveMap() {
       },
       { timeout: 15000, enableHighAccuracy: true },
     );
-  };
+  });
 
   const routeMeToIncident = async () => {
     if (!selected) return;

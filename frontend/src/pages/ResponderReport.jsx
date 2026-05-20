@@ -2,13 +2,12 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getIncident, submitResponderReport } from '../services/api';
 import { CATEGORY_COLORS, STATUS_LABELS } from '../components/IncidentMap';
-import { Loader, Send, AlertTriangle } from 'lucide-react';
+import { Loader, Send } from 'lucide-react';
 
 const OUTCOMES = [
   { value: 'genuine', label: 'Genuine — incident confirmed and being handled' },
   { value: 'resolved', label: 'Resolved — situation handled on scene' },
   { value: 'duplicate', label: 'Duplicate — same as another report' },
-  { value: 'false_alarm', label: 'False alarm — no incident actually occurred' },
 ];
 
 const AUTHORITIES = [
@@ -31,7 +30,6 @@ export default function ResponderReport() {
     responder_authority: '',
     outcome: 'genuine',
     notes: '',
-    is_false_alarm: false,
   });
 
   useEffect(() => {
@@ -60,7 +58,7 @@ export default function ResponderReport() {
         responder_authority: form.responder_authority,
         outcome: form.outcome,
         notes: form.notes,
-        is_false_alarm: form.outcome === 'false_alarm' || form.is_false_alarm,
+        is_false_alarm: false,
       });
       setSuccess('Responder report submitted successfully.');
       setTimeout(() => navigate('/track', { state: { incidentId: parseInt(incidentId, 10) } }), 1500);
@@ -85,7 +83,7 @@ export default function ResponderReport() {
   return (
     <div className="page">
       <h1>Responder Report</h1>
-      <p className="page-subtitle">For the official who attended this incident. Use this form to confirm details or flag a false alarm.</p>
+      <p className="page-subtitle">For the official who attended this incident. Use this form to confirm details. Only the authority dashboard can mark a report as a false alarm.</p>
 
       <div className="track-result" style={{ marginBottom: 20 }}>
         <h3 style={{ marginBottom: 10 }}>Incident #{incident.id}: {incident.title}</h3>
@@ -139,11 +137,6 @@ export default function ResponderReport() {
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </select>
-          {form.outcome === 'false_alarm' && (
-            <p className="field-hint warning">
-              <AlertTriangle size={14} /> This will mark the report as a false alarm and update its status to "fake".
-            </p>
-          )}
         </div>
 
         <div className="form-group">

@@ -7,7 +7,10 @@ from typing import Optional
 
 from database import get_db
 from models import Incident, IncidentReport, IncidentCategory, IncidentStatus, AuthorityType
-from schemas import IncidentCreate, IncidentUpdate, IncidentResponse, IncidentReportCreate, IncidentReportResponse
+from schemas import (
+    IncidentCreate, IncidentUpdate, IncidentResponse,
+    IncidentReportCreate, IncidentReportUpdate, IncidentReportResponse,
+)
 from services.notification import (
     create_incident_notification,
     get_responsible_authority,
@@ -239,3 +242,54 @@ def create_incident_report(
     db.commit()
     db.refresh(report)
     return report
+
+
+@router.patch("/{incident_id}/reports/{report_id}", response_model=IncidentReportResponse)
+def update_incident_report(
+    incident_id: int,
+    report_id: int,
+    payload: IncidentReportUpdate,
+    db: Session = Depends(get_db),
+):
+    report = (
+        db.query(IncidentReport)
+        .filter(IncidentReport.id == report_id, IncidentReport.incident_id == incident_id)
+        .first()
+    )
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    data = payload.model_dump(exclude_unset=True)
+    # Keep false-alarm flag in sync with outcome
+    if "outcome" in data and "is_false_alarm" not in data:
+        data["is_false_alarm"] = data["outcome"] == "false_alarm"
+
+    for key, value in data.items():
+        setattr(report, key, value)
+
+    # If marked closed, also resolve the incident
+    if data.get("is_closed"):
+        incident = db.query(Incident).filter(Incident.id == incident_id).first()
+        if incident:
+            if report.is_false_alarm:
+                incident.status = IncidentStatus.FAKE
+            else:
+                incident.status = IncidentStatus.RESOLVED
+
+    db.commit()
+    db.refresh(report)
+    return report
+
+
+@router.delete("/{incident_id}/reports/{report_id}")
+def delete_incident_report(incident_id: int, report_id: int, db: Session = Depends(get_db)):
+    report = (
+        db.query(IncidentReport)
+        .filter(IncidentReport.id == report_id, IncidentReport.incident_id == incident_id)
+        .first()
+    )
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+    db.delete(report)
+    db.commit()
+    return {"detail": "Report deleted"}

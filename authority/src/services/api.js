@@ -25,11 +25,6 @@ export const updateIncident = (id, data) =>
 export const deleteIncident = (id) =>
   api.delete(`/incidents/${id}`);
 
-export const classifyImage = (formData) =>
-  api.post('/incidents/classify-image', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  });
-
 // --- Alerts ---
 export const createAlert = (data, issuedBy) =>
   api.post(`/alerts/?issued_by=${issuedBy}`, data);
@@ -83,6 +78,12 @@ export const submitResponderReport = (incidentId, payload) =>
 
 export const getIncidentReports = (incidentId) =>
   api.get(`/incidents/${incidentId}/reports`);
+
+export const updateIncidentReport = (incidentId, reportId, payload) =>
+  api.patch(`/incidents/${incidentId}/reports/${reportId}`, payload);
+
+export const deleteIncidentReport = (incidentId, reportId) =>
+  api.delete(`/incidents/${incidentId}/reports/${reportId}`);
 
 export const getAllResponderReports = (params = {}) =>
   api.get('/incidents/reports/all', { params });

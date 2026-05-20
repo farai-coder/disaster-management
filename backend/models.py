@@ -42,7 +42,6 @@ class Incident(Base):
     longitude = Column(Float, nullable=False)
     location_name = Column(String(300), nullable=True)
     photo_url = Column(String(500), nullable=True)
-    ai_suggested_category = Column(SAEnum(IncidentCategory), nullable=True)
     is_anonymous = Column(Boolean, default=False)
     reporter_name = Column(String(100), nullable=True)
     reporter_contact = Column(String(100), nullable=True)
@@ -107,4 +106,7 @@ class IncidentReport(Base):
     outcome = Column(String(50), nullable=False)  # genuine, false_alarm, duplicate, resolved
     notes = Column(Text, nullable=True)
     is_false_alarm = Column(Boolean, default=False)
+    is_validated = Column(Boolean, default=False)
+    is_closed = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)

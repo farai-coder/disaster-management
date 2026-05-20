@@ -3,11 +3,14 @@ import {
   getIncidents,
   getIncidentReports,
   submitResponderReport,
+  updateIncidentReport,
+  deleteIncidentReport,
+  updateIncident,
 } from '../services/api';
 import { CATEGORY_COLORS, STATUS_LABELS } from '../components/IncidentMap';
 import {
   ClipboardCheck, AlertTriangle, CheckCircle, Loader, Filter, RefreshCw,
-  X, Send, MapPin, Clock, ChevronDown, ChevronUp,
+  X, Send, MapPin, Clock, ChevronDown, ChevronUp, Pencil, Trash2, ShieldCheck, Lock,
 } from 'lucide-react';
 
 const OUTCOMES = [
@@ -46,6 +49,8 @@ export default function Attendance() {
   });
   const [submittingId, setSubmittingId] = useState(null);
   const [error, setError] = useState('');
+  const [editing, setEditing] = useState(null); // { reportId, incidentId, ...fields }
+  const [busyReportId, setBusyReportId] = useState(null);
 
   const fetchIncidents = async () => {
     setLoading(true);
@@ -70,6 +75,13 @@ export default function Attendance() {
   };
 
   useEffect(() => { fetchIncidents(); }, [statusFilter, scope]);
+
+  const refreshReportsFor = async (incidentId) => {
+    try {
+      const r = await getIncidentReports(incidentId);
+      setReportsByIncident((prev) => ({ ...prev, [incidentId]: r.data }));
+    } catch { /* ignore */ }
+  };
 
   const totals = {
     incidents: incidents.length,
@@ -99,8 +111,7 @@ export default function Attendance() {
         is_false_alarm: logForm.outcome === 'false_alarm',
       });
       setLogForm({ ...logForm, notes: '' });
-      const r = await getIncidentReports(incidentId);
-      setReportsByIncident((prev) => ({ ...prev, [incidentId]: r.data }));
+      await refreshReportsFor(incidentId);
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to submit attendance.');
     }
@@ -125,13 +136,96 @@ export default function Attendance() {
         notes: 'Flagged as false alarm from attendance dashboard.',
         is_false_alarm: true,
       });
-      const r = await getIncidentReports(incidentId);
-      setReportsByIncident((prev) => ({ ...prev, [incidentId]: r.data }));
+      await refreshReportsFor(incidentId);
       fetchIncidents();
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to flag.');
     }
     setSubmittingId(null);
+  };
+
+  const startEdit = (incidentId, report) => {
+    setEditing({
+      reportId: report.id,
+      incidentId,
+      responder_name: report.responder_name,
+      outcome: report.outcome,
+      notes: report.notes || '',
+    });
+  };
+
+  const cancelEdit = () => setEditing(null);
+
+  const saveEdit = async () => {
+    if (!editing) return;
+    setError('');
+    setBusyReportId(editing.reportId);
+    try {
+      await updateIncidentReport(editing.incidentId, editing.reportId, {
+        responder_name: editing.responder_name.trim(),
+        outcome: editing.outcome,
+        notes: editing.notes,
+        is_false_alarm: editing.outcome === 'false_alarm',
+      });
+      await refreshReportsFor(editing.incidentId);
+      setEditing(null);
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to update attendance.');
+    }
+    setBusyReportId(null);
+  };
+
+  const validateReport = async (incidentId, report) => {
+    setError('');
+    setBusyReportId(report.id);
+    try {
+      await updateIncidentReport(incidentId, report.id, {
+        is_validated: !report.is_validated,
+      });
+      await refreshReportsFor(incidentId);
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to validate attendance.');
+    }
+    setBusyReportId(null);
+  };
+
+  const closeReport = async (incidentId, report) => {
+    if (!confirm('Close this attendance entry? The incident will be marked resolved (or fake if false alarm).')) return;
+    setError('');
+    setBusyReportId(report.id);
+    try {
+      await updateIncidentReport(incidentId, report.id, { is_closed: true });
+      await refreshReportsFor(incidentId);
+      fetchIncidents();
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to close attendance.');
+    }
+    setBusyReportId(null);
+  };
+
+  const reopenReport = async (incidentId, report) => {
+    setError('');
+    setBusyReportId(report.id);
+    try {
+      await updateIncidentReport(incidentId, report.id, { is_closed: false });
+      await refreshReportsFor(incidentId);
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to reopen attendance.');
+    }
+    setBusyReportId(null);
+  };
+
+  const removeReport = async (incidentId, report) => {
+    if (!confirm(`Delete attendance entry by ${report.responder_name}? This cannot be undone.`)) return;
+    setError('');
+    setBusyReportId(report.id);
+    try {
+      await deleteIncidentReport(incidentId, report.id);
+      await refreshReportsFor(incidentId);
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to delete attendance.');
+    }
+    setBusyReportId(null);
   };
 
   return (
@@ -143,8 +237,8 @@ export default function Attendance() {
         </button>
       </div>
       <p className="page-subtitle">
-        Log who attended each incident and flag false alarms here. Each entry is saved as a responder
-        report against the incident.
+        Log who attended each incident, validate the entry, edit details, close or delete it. Only the
+        authority can confirm a false alarm.
       </p>
 
       <div className="stats-grid" style={{ marginTop: 12 }}>
@@ -286,24 +380,135 @@ export default function Attendance() {
                               </p>
                             ) : (
                               <div style={{ marginBottom: 12 }}>
-                                {reports.map((r) => (
-                                  <div key={r.id} className="responder-report">
-                                    <p>
-                                      <strong>{r.responder_name}</strong>{' '}
-                                      ({r.responder_authority.replace('_', ' ')}) —{' '}
-                                      <span className={`badge ${OUTCOME_BADGE_CLASS[r.outcome] || ''}`}>
-                                        {OUTCOME_LABELS[r.outcome] || r.outcome}
-                                      </span>
-                                      {r.is_false_alarm && (
-                                        <span className="badge badge-status-fake" style={{ marginLeft: 4 }}>
-                                          <AlertTriangle size={11} /> False alarm
-                                        </span>
+                                {reports.map((r) => {
+                                  const isEditing = editing?.reportId === r.id;
+                                  return (
+                                    <div
+                                      key={r.id}
+                                      className="responder-report"
+                                      style={r.is_closed ? { opacity: 0.7, borderLeft: '3px solid #9ca3af' } : undefined}
+                                    >
+                                      {isEditing ? (
+                                        <div>
+                                          <div className="form-row">
+                                            <div className="form-group">
+                                              <label>Responder name</label>
+                                              <input
+                                                type="text"
+                                                value={editing.responder_name}
+                                                onChange={(e) => setEditing({ ...editing, responder_name: e.target.value })}
+                                              />
+                                            </div>
+                                            <div className="form-group">
+                                              <label>Outcome</label>
+                                              <select
+                                                value={editing.outcome}
+                                                onChange={(e) => setEditing({ ...editing, outcome: e.target.value })}
+                                              >
+                                                {OUTCOMES.map((o) => (
+                                                  <option key={o.value} value={o.value}>{o.label}</option>
+                                                ))}
+                                              </select>
+                                            </div>
+                                          </div>
+                                          <div className="form-group">
+                                            <label>Notes</label>
+                                            <textarea
+                                              value={editing.notes}
+                                              onChange={(e) => setEditing({ ...editing, notes: e.target.value })}
+                                              rows={3}
+                                            />
+                                          </div>
+                                          <div className="action-buttons">
+                                            <button
+                                              className="btn btn-sm btn-primary"
+                                              onClick={saveEdit}
+                                              disabled={busyReportId === r.id}
+                                            >
+                                              {busyReportId === r.id ? <Loader size={12} className="spin" /> : <Send size={12} />}
+                                              Save changes
+                                            </button>
+                                            <button className="btn btn-sm btn-outline" onClick={cancelEdit}>
+                                              <X size={12} /> Cancel
+                                            </button>
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <>
+                                          <p>
+                                            <strong>{r.responder_name}</strong>{' '}
+                                            ({r.responder_authority.replace('_', ' ')}) —{' '}
+                                            <span className={`badge ${OUTCOME_BADGE_CLASS[r.outcome] || ''}`}>
+                                              {OUTCOME_LABELS[r.outcome] || r.outcome}
+                                            </span>
+                                            {r.is_false_alarm && (
+                                              <span className="badge badge-status-fake" style={{ marginLeft: 4 }}>
+                                                <AlertTriangle size={11} /> False alarm
+                                              </span>
+                                            )}
+                                            {r.is_validated && (
+                                              <span className="badge badge-status-verified" style={{ marginLeft: 4 }}>
+                                                <ShieldCheck size={11} /> Validated
+                                              </span>
+                                            )}
+                                            {r.is_closed && (
+                                              <span className="badge badge-status-resolved" style={{ marginLeft: 4 }}>
+                                                <Lock size={11} /> Closed
+                                              </span>
+                                            )}
+                                          </p>
+                                          {r.notes && <p>{r.notes}</p>}
+                                          <p className="detail-time">{new Date(r.created_at).toLocaleString()}</p>
+                                          <div className="action-buttons" style={{ marginTop: 6 }}>
+                                            <button
+                                              className={`btn btn-sm ${r.is_validated ? 'btn-outline' : 'btn-success'}`}
+                                              onClick={() => validateReport(inc.id, r)}
+                                              disabled={busyReportId === r.id || r.is_closed}
+                                              title={r.is_validated ? 'Mark as not validated' : 'Validate this attendance'}
+                                            >
+                                              <ShieldCheck size={12} /> {r.is_validated ? 'Unvalidate' : 'Validate'}
+                                            </button>
+                                            <button
+                                              className="btn btn-sm btn-outline"
+                                              onClick={() => startEdit(inc.id, r)}
+                                              disabled={busyReportId === r.id || r.is_closed}
+                                              title="Edit attendance"
+                                            >
+                                              <Pencil size={12} /> Edit
+                                            </button>
+                                            {r.is_closed ? (
+                                              <button
+                                                className="btn btn-sm btn-warning"
+                                                onClick={() => reopenReport(inc.id, r)}
+                                                disabled={busyReportId === r.id}
+                                                title="Reopen this attendance"
+                                              >
+                                                <RefreshCw size={12} /> Reopen
+                                              </button>
+                                            ) : (
+                                              <button
+                                                className="btn btn-sm btn-primary"
+                                                onClick={() => closeReport(inc.id, r)}
+                                                disabled={busyReportId === r.id}
+                                                title="Close attendance and resolve incident"
+                                              >
+                                                <Lock size={12} /> Close
+                                              </button>
+                                            )}
+                                            <button
+                                              className="btn btn-sm btn-danger"
+                                              onClick={() => removeReport(inc.id, r)}
+                                              disabled={busyReportId === r.id}
+                                              title="Delete attendance"
+                                            >
+                                              <Trash2 size={12} /> Delete
+                                            </button>
+                                          </div>
+                                        </>
                                       )}
-                                    </p>
-                                    {r.notes && <p>{r.notes}</p>}
-                                    <p className="detail-time">{new Date(r.created_at).toLocaleString()}</p>
-                                  </div>
-                                ))}
+                                    </div>
+                                  );
+                                })}
                               </div>
                             )}
 

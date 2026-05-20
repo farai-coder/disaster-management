@@ -2,6 +2,7 @@ import { Outlet, Link, useLocation, useNavigate, Navigate } from 'react-router-d
 import {
   Shield, Menu, X, ChevronLeft, ChevronRight, LogOut, Bell,
   LayoutDashboard, FileText, PlusCircle, Map, Home, BarChart3, Settings, ClipboardCheck, UserCheck,
+  Flame, HeartPulse, ShieldAlert,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { getNotifications } from '../services/api';
@@ -15,6 +16,13 @@ const navItems = [
   { path: '/reports', label: 'Reports', icon: BarChart3 },
   { path: '/settings', label: 'Account Settings', icon: Settings },
 ];
+
+const AUTHORITY_BRAND = {
+  police: { Icon: Shield, label: 'Police' },
+  fire_department: { Icon: Flame, label: 'Fire Department' },
+  health: { Icon: HeartPulse, label: 'Health' },
+  civil_protection: { Icon: ShieldAlert, label: 'Civil Protection' },
+};
 
 export default function AuthorityLayout() {
   const location = useLocation();
@@ -62,6 +70,9 @@ export default function AuthorityLayout() {
   };
 
   const authorityClass = authority ? `theme-${authority.authority_type}` : '';
+  const brand = AUTHORITY_BRAND[authority?.authority_type];
+  const BrandIcon = brand?.Icon || Shield;
+  const brandLabel = brand?.label || 'Authority';
 
   return (
     <div className={`app-layout ${collapsed ? 'sidebar-collapsed' : ''} ${authorityClass}`}>
@@ -71,11 +82,11 @@ export default function AuthorityLayout() {
 
       <aside className={`sidebar sidebar-authority ${mobileOpen ? 'mobile-open' : ''}`}>
         <div className="sidebar-header">
-          <Link to="/dashboard" className="sidebar-brand">
+          <Link to="/dashboard" className="sidebar-brand" title={brandLabel}>
             <div className="brand-icon brand-icon-authority">
-              <Shield size={20} />
+              <BrandIcon size={20} />
             </div>
-            {!collapsed && <span className="brand-text">Authority</span>}
+            {!collapsed && <span className="brand-text">{brandLabel}</span>}
           </Link>
           <button
             className="collapse-btn desktop-only"

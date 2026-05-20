@@ -25,11 +25,6 @@ export const updateIncident = (id, data) =>
 export const deleteIncident = (id) =>
   api.delete(`/incidents/${id}`);
 
-export const classifyImage = (formData) =>
-  api.post('/incidents/classify-image', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  });
-
 // --- Alerts ---
 export const createAlert = (data, issuedBy) =>
   api.post(`/alerts/?issued_by=${issuedBy}`, data);
