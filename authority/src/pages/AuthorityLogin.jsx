@@ -105,7 +105,7 @@ export default function AuthorityLogin() {
 
         <div className="login-back-link" style={{ display: 'flex', justifyContent: 'space-between', marginTop: 12 }}>
           <Link to="/signup"><UserPlus size={14} /> Create authority account</Link>
-          <a href="http://localhost:5173/">Back to Public Portal</a>
+          <a href={`${import.meta.env.VITE_PUBLIC_URL || 'http://localhost:5173'}/`}>Back to Public Portal</a>
         </div>
       </div>
     </div>

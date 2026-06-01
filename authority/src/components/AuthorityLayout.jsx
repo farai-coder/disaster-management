@@ -122,7 +122,7 @@ export default function AuthorityLayout() {
           <div className="nav-section">
             {!collapsed && <span className="nav-section-label">Quick Links</span>}
             <a
-              href="http://localhost:5173/map"
+              href={`${import.meta.env.VITE_PUBLIC_URL || 'http://localhost:5173'}/map`}
               className="sidebar-link"
               title={collapsed ? 'Public Map' : undefined}
             >
@@ -130,7 +130,7 @@ export default function AuthorityLayout() {
               {!collapsed && <span>Public Map</span>}
             </a>
             <a
-              href="http://localhost:5173/"
+              href={`${import.meta.env.VITE_PUBLIC_URL || 'http://localhost:5173'}/`}
               className="sidebar-link"
               title={collapsed ? 'Public Portal' : undefined}
             >

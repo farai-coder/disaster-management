@@ -76,7 +76,7 @@ export default function PublicLayout() {
 
         <div className="sidebar-footer">
           <a
-            href="http://localhost:5174/login"
+            href={`${import.meta.env.VITE_AUTHORITY_URL || 'http://localhost:5174'}/login`}
             className="sidebar-link authority-login-link"
             title={collapsed ? 'Authority Portal' : undefined}
           >

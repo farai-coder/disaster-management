@@ -1,7 +1,10 @@
 import axios from 'axios';
 
 const API_HOST = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
-const API_BASE = `http://${API_HOST}:8000/api`;
+// In production VITE_API_BASE_URL is baked in at build time (e.g. https://api.disaster.shopivell.com).
+// Locally it falls back to the dev backend on :8000.
+const API_ROOT = import.meta.env.VITE_API_BASE_URL || `http://${API_HOST}:8000`;
+const API_BASE = `${API_ROOT}/api`;
 
 const api = axios.create({
   baseURL: API_BASE,
@@ -88,4 +91,4 @@ export const deleteIncidentReport = (incidentId, reportId) =>
 export const getAllResponderReports = (params = {}) =>
   api.get('/incidents/reports/all', { params });
 
-export const UPLOAD_BASE = `http://${API_HOST}:8000`;
+export const UPLOAD_BASE = API_ROOT;
