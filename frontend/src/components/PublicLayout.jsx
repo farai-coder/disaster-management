@@ -4,6 +4,7 @@ import {
   Menu, X, Search, ChevronLeft, ChevronRight, Shield,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import ThemeToggle from './ThemeToggle';
 
 const navItems = [
   { path: '/', label: 'Home', icon: Home },
@@ -94,6 +95,7 @@ export default function PublicLayout() {
           <div className="topbar-title">
             Zimbabwe Disaster Management System
           </div>
+          <ThemeToggle className="topbar-theme-toggle" />
         </header>
 
         <main className="main-content">

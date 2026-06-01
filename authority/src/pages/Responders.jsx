@@ -147,7 +147,7 @@ export default function Responders() {
             <tbody>
               {filtered.map((r) => (
                 <tr key={r.id}>
-                  <td>#{r.incident_id}{r.incident_title ? ` — ${r.incident_title}` : ''}</td>
+                  <td>#{r.incident_id}{r.incident_title ? ` - ${r.incident_title}` : ''}</td>
                   <td>
                     {r.incident_category && (
                       <span className="badge" style={{ background: CATEGORY_COLORS[r.incident_category], color: 'white' }}>
@@ -166,11 +166,11 @@ export default function Responders() {
                     {r.is_false_alarm ? (
                       <span className="badge badge-status-fake"><AlertTriangle size={12} /> Flagged</span>
                     ) : (
-                      '—'
+                      '-'
                     )}
                   </td>
                   <td style={{ maxWidth: 320, fontSize: '0.85rem', color: 'var(--gray-600, #4b5563)' }}>
-                    {r.notes || '—'}
+                    {r.notes || '-'}
                   </td>
                   <td>{new Date(r.created_at).toLocaleString()}</td>
                   <td>

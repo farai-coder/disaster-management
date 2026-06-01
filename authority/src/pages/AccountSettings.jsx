@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { changePassword } from '../services/api';
-import { Lock, Loader } from 'lucide-react';
+import { Lock, Loader, Moon, Sun } from 'lucide-react';
+import { getTheme, setTheme } from '../theme';
 
 export default function AccountSettings() {
   const authority = JSON.parse(localStorage.getItem('authority') || '{}');
@@ -8,6 +9,15 @@ export default function AccountSettings() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [theme, setThemeState] = useState(getTheme());
+
+  useEffect(() => {
+    const sync = () => setThemeState(getTheme());
+    window.addEventListener('dm-themechange', sync);
+    return () => window.removeEventListener('dm-themechange', sync);
+  }, []);
+
+  const isDark = theme === 'dark';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -39,6 +49,26 @@ export default function AccountSettings() {
     <div className="page">
       <h1>Account Settings</h1>
       <p className="page-subtitle">Manage your authority account.</p>
+
+      <div className="dashboard-section" style={{ maxWidth: 640 }}>
+        <h2>{isDark ? <Moon size={18} /> : <Sun size={18} />} Appearance</h2>
+        <div className="appearance-row">
+          <div>
+            <strong className="appearance-title">Dark mode</strong>
+            <p className="appearance-hint">Use a darker colour scheme that is easier on the eyes at night.</p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={isDark}
+            className={`switch ${isDark ? 'switch-on' : ''}`}
+            onClick={() => { const next = isDark ? 'light' : 'dark'; setTheme(next); setThemeState(next); }}
+            title={isDark ? 'Turn off dark mode' : 'Turn on dark mode'}
+          >
+            <span className="switch-thumb" />
+          </button>
+        </div>
+      </div>
 
       <div className="dashboard-section" style={{ maxWidth: 640 }}>
         <h2><Lock size={18} /> Change Password</h2>

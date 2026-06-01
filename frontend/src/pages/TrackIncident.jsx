@@ -251,7 +251,7 @@ export default function TrackIncident() {
               <strong>Responder Reports</strong>
               {reports.map((r) => (
                 <div key={r.id} className="responder-report">
-                  <p><strong>{r.responder_name}</strong> ({r.responder_authority.replace('_', ' ')}) — outcome: <em>{r.outcome.replace('_', ' ')}</em></p>
+                  <p><strong>{r.responder_name}</strong> ({r.responder_authority.replace('_', ' ')}) - outcome: <em>{r.outcome.replace('_', ' ')}</em></p>
                   {r.notes && <p>{r.notes}</p>}
                   <p className="detail-time">{new Date(r.created_at).toLocaleString()}</p>
                 </div>

@@ -191,7 +191,7 @@ export default function IncidentMap({
         </LayersControl.BaseLayer>
         <LayersControl.BaseLayer name="Satellite">
           <TileLayer
-            attribution='Tiles &copy; Esri &mdash; Source: Esri, USGS, NOAA'
+            attribution='Tiles &copy; Esri - Source: Esri, USGS, NOAA'
             url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
             maxZoom={19}
           />

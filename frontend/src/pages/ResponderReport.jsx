@@ -5,9 +5,9 @@ import { CATEGORY_COLORS, STATUS_LABELS } from '../components/IncidentMap';
 import { Loader, Send } from 'lucide-react';
 
 const OUTCOMES = [
-  { value: 'genuine', label: 'Genuine — incident confirmed and being handled' },
-  { value: 'resolved', label: 'Resolved — situation handled on scene' },
-  { value: 'duplicate', label: 'Duplicate — same as another report' },
+  { value: 'genuine', label: 'Genuine - incident confirmed and being handled' },
+  { value: 'resolved', label: 'Resolved - situation handled on scene' },
+  { value: 'duplicate', label: 'Duplicate - same as another report' },
 ];
 
 const AUTHORITIES = [

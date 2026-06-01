@@ -369,7 +369,7 @@ export default function ReportIncident() {
     <div className="page report-page">
       <h1>Report an Incident</h1>
       <p className="page-subtitle">
-        Submit a report. All fields are optional &mdash; just give what you can.
+        Submit a report. All fields are optional - just give what you can.
       </p>
 
       {error && <div className="alert alert-error">{error}</div>}

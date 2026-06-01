@@ -348,7 +348,7 @@ export default function ManageIncidents() {
               <h4>Responder Reports</h4>
               {responderReports.map((r) => (
                 <div key={r.id} className="responder-report">
-                  <p><strong>{r.responder_name}</strong> ({r.responder_authority.replace('_', ' ')}) — {r.outcome.replace('_', ' ')}</p>
+                  <p><strong>{r.responder_name}</strong> ({r.responder_authority.replace('_', ' ')}) - {r.outcome.replace('_', ' ')}</p>
                   {r.notes && <p>{r.notes}</p>}
                   <p className="detail-time">{new Date(r.created_at).toLocaleString()}</p>
                 </div>

@@ -16,10 +16,10 @@ import {
 } from 'lucide-react';
 
 const OUTCOMES = [
-  { value: 'genuine', label: 'Genuine — incident confirmed' },
-  { value: 'resolved', label: 'Resolved — handled on scene' },
-  { value: 'duplicate', label: 'Duplicate — same as another report' },
-  { value: 'false_alarm', label: 'False alarm — no incident occurred' },
+  { value: 'genuine', label: 'Genuine - incident confirmed' },
+  { value: 'resolved', label: 'Resolved - handled on scene' },
+  { value: 'duplicate', label: 'Duplicate - same as another report' },
+  { value: 'false_alarm', label: 'False alarm - no incident occurred' },
 ];
 
 const OUTCOME_LABELS = {
@@ -355,7 +355,7 @@ export default function Attendance() {
                           onClick={() => setExpandedId(isExpanded ? null : inc.id)}
                         >
                           {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                          #{inc.id} — {inc.title}
+                          #{inc.id} - {inc.title}
                         </button>
                       </td>
                       <td>
@@ -482,7 +482,7 @@ export default function Attendance() {
                                         <>
                                           <p>
                                             <strong>{r.responder_name}</strong>{' '}
-                                            ({r.responder_authority.replace('_', ' ')}) —{' '}
+                                            ({r.responder_authority.replace('_', ' ')}) -{' '}
                                             <span className={`badge ${OUTCOME_BADGE_CLASS[r.outcome] || ''}`}>
                                               {OUTCOME_LABELS[r.outcome] || r.outcome}
                                             </span>

@@ -83,7 +83,7 @@ export default function Reports() {
             <p>
               <strong>Authority:</strong> {authority.name} ({authority.authority_type?.replace('_', ' ')})<br />
               <strong>Generated:</strong> {new Date(summary.generated_at).toLocaleString()}<br />
-              {summary.range.start && <><strong>Range:</strong> {new Date(summary.range.start).toLocaleDateString()} – {summary.range.end ? new Date(summary.range.end).toLocaleDateString() : 'now'}<br /></>}
+              {summary.range.start && <><strong>Range:</strong> {new Date(summary.range.start).toLocaleDateString()} - {summary.range.end ? new Date(summary.range.end).toLocaleDateString() : 'now'}<br /></>}
             </p>
           </header>
 
@@ -177,7 +177,7 @@ export default function Reports() {
           </section>
 
           <footer className="report-footer">
-            <p>Zimbabwe Disaster Management System &mdash; Confidential, for authority use.</p>
+            <p>Zimbabwe Disaster Management System - Confidential, for authority use.</p>
           </footer>
         </div>
       )}

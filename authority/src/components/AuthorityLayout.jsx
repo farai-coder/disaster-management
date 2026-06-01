@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { getNotifications } from '../services/api';
+import ThemeToggle from './ThemeToggle';
 
 const navItems = [
   { path: '/dashboard', label: 'Overview', icon: LayoutDashboard },
@@ -170,8 +171,9 @@ export default function AuthorityLayout() {
             <Menu size={22} />
           </button>
           <div className="topbar-title">
-            Authority Dashboard &mdash; {authority?.name || 'Loading...'}
+            Authority Dashboard - {authority?.name || 'Loading...'}
           </div>
+          <ThemeToggle className="topbar-theme-toggle" />
           <Link
             to="/dashboard"
             className={`topbar-bell ${unreadCount > 0 ? 'has-unread' : ''}`}
